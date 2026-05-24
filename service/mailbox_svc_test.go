@@ -13,10 +13,11 @@ import (
 
 type testProviderFactory struct{}
 
-func (f *testProviderFactory) NewProvider(record model.MailboxRecord) (provider.EmailProvider, error) {
+func (f *testProviderFactory) NewProvider(record model.MailboxRecord) (*provider.MailProvider, error) {
 	auth := make(map[string]string)
 	json.Unmarshal([]byte(record.AuthData), &auth)
-	return cloudflare.New(record.BaseURL, auth["jwt"], auth["site_password"]), nil
+	c := cloudflare.New(record.BaseURL, auth["jwt"], auth["site_password"])
+	return &provider.MailProvider{Receiver: c, Sender: c}, nil
 }
 
 func TestMailboxServiceAddList(t *testing.T) {
