@@ -13,15 +13,15 @@ import (
 )
 
 type Server struct {
-	httpServer   *http.Server
-	handler      *Handler
-	userSvc      *service.UserService
-	mux          *http.ServeMux
-	adminHandler func(mux *http.ServeMux)
+	httpServer    *http.Server
+	handler       *Handler
+	userSvc       *service.UserService
+	mux           *http.ServeMux
+	adminHandlers []func(mux *http.ServeMux)
 }
 
 func (s *Server) RegisterAdmin(fn func(mux *http.ServeMux)) {
-	s.adminHandler = fn
+	s.adminHandlers = append(s.adminHandlers, fn)
 }
 
 func NewServer(addr string, handler *Handler, userSvc *service.UserService) *Server {
@@ -57,8 +57,8 @@ func (s *Server) Start() error {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	if s.adminHandler != nil {
-		s.adminHandler(mux)
+	for _, h := range s.adminHandlers {
+		h(mux)
 	}
 	s.mux = mux
 	s.httpServer.Handler = mux
