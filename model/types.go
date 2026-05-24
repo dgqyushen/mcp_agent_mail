@@ -94,3 +94,4 @@ type MailboxRecord struct {
 	BaseURL      string
 	AuthData     string
 }
+
