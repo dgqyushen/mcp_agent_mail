@@ -44,7 +44,10 @@ func TestTokenDeactivate(t *testing.T) {
 	if _, err := db.CreateUser("TestUser"); err != nil {
 		t.Fatal(err)
 	}
-	db.InsertToken(1, "old_hash", "atm-old***")
+	_, err = db.InsertToken(1, "old_hash", "atm-old***")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := db.DeactivateTokens(1); err != nil {
 		t.Fatal(err)

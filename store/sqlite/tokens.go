@@ -15,11 +15,23 @@ type Token struct {
 }
 
 func (db *DB) InsertToken(userID int, tokenHash, prefix string) (*Token, error) {
-	result, err := db.conn.Exec(
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("UPDATE tokens SET is_active = 0 WHERE user_id = ? AND is_active = 1", userID); err != nil {
+		return nil, err
+	}
+	result, err := tx.Exec(
 		"INSERT INTO tokens (user_id, token_hash, prefix) VALUES (?, ?, ?)",
 		userID, tokenHash, prefix,
 	)
 	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	id, _ := result.LastInsertId()

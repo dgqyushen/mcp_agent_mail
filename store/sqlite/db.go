@@ -3,6 +3,7 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -27,6 +28,10 @@ func Open(path string) (*DB, error) {
 		// file doesn't exist yet, SQLite will create it; chmod after first query
 	}
 	db := &DB{conn: conn}
+	_, pragmaErr := conn.Exec("PRAGMA foreign_keys = ON")
+	if pragmaErr != nil {
+		slog.Warn("failed to enable foreign keys", "error", pragmaErr)
+	}
 	if err := db.migrate(); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("migrate: %w", err)

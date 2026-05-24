@@ -82,6 +82,40 @@ func TestMailboxDeleteNotFound(t *testing.T) {
 	}
 }
 
+func TestMailboxUserIsolation(t *testing.T) {
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	db.CreateUser("Alice")
+	db.CreateUser("Bob")
+
+	db.InsertMailbox(model.MailboxRecord{UserID: 1, Alias: "inbox", Name: "AInbox", BaseURL: "https://a.com", AuthData: "{}"})
+	db.InsertMailbox(model.MailboxRecord{UserID: 2, Alias: "inbox", Name: "BInbox", BaseURL: "https://b.com", AuthData: "{}"})
+
+	aliceList, _ := db.ListMailboxes(1)
+	if len(aliceList) != 1 || aliceList[0].Name != "AInbox" {
+		t.Errorf("Alice should see 1 mailbox, got %+v", aliceList)
+	}
+
+	bobList, _ := db.ListMailboxes(2)
+	if len(bobList) != 1 || bobList[0].Name != "BInbox" {
+		t.Errorf("Bob should see 1 mailbox, got %+v", bobList)
+	}
+
+	_, err = db.GetMailbox(1, "inbox")
+	if err != nil {
+		t.Errorf("Alice should get her own inbox, got error: %v", err)
+	}
+
+	err = db.DeleteMailbox(1, "inbox")
+	if err != nil {
+		t.Errorf("Alice should delete her own inbox, got: %v", err)
+	}
+}
+
 func TestMailboxDuplicate(t *testing.T) {
 	db, err := sqlite.Open(":memory:")
 	if err != nil {
