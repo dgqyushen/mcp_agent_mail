@@ -108,7 +108,7 @@ site_password = "site-password-if-enabled"
   "mcpServers": {
     "agent-mail": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "-v", "~/.agent-mail:/root/.agent-mail", "agent-mail"]
+      "args": ["run", "-i", "--rm", "-v", "~/.agent-mail:/root/.agent-mail:ro", "dgqyushen/agent-mail"]
     }
   }
 }
@@ -157,6 +157,15 @@ site_password = "site-password-if-enabled"
 | `get_webhook` | Get webhook config |
 | `set_webhook` | Configure webhook URL |
 | `list_attachments` | List S3 attachments |
+
+## Docker
+
+```bash
+docker pull dgqyushen/agent-mail:latest
+docker run -i --rm -v ~/.agent-mail:/root/.agent-mail:ro dgqyushen/agent-mail
+```
+
+Image: ~20MB (multi-stage, FROM scratch)
 
 ## Build
 

@@ -1,6 +1,6 @@
 services:
   agent-mail:
-    image: agent-mail:latest
+    image: dgqyushen/agent-mail:latest
     command: --transport sse --addr :9090
     ports:
       - "9090:9090"
