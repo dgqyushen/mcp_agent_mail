@@ -323,7 +323,10 @@ func parseMessage(msg *gmail.Message) *model.ParsedMail {
 		createdAt = time.UnixMilli(msg.InternalDate).Format(time.RFC3339)
 	}
 
-	id, _ := strconv.ParseInt(msg.Id, 10, 64)
+	id, err := strconv.ParseInt(msg.Id, 10, 64)
+	if err != nil {
+		id = 0
+	}
 
 	return &model.ParsedMail{
 		ID:          int(id),
