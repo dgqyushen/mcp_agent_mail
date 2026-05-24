@@ -1,0 +1,31 @@
+{{template "base" .}}
+{{define "title"}}创建用户{{end}}
+{{define "content"}}
+{{if .Success}}
+<div class="card">
+<h2 style="margin-bottom:1rem">用户创建成功</h2>
+<div class="alert alert-success">用户 <strong>{{.Name}}</strong> 已创建</div>
+<h3 style="margin-top:1rem">Token（仅显示一次！请立即复制）</h3>
+<div class="token-box">{{.Token}}</div>
+<p style="margin-top:1rem;color:#666">此 Token 关闭后将无法再次查看，请妥善保管。</p>
+<p>MCP 客户端配置示例：</p>
+<div class="token-box" style="color:#aaa">
+{"headers":{"X-Agent-Mail-Token":"{{.Token}}"}}
+</div>
+<a href="/admin/users" class="btn btn-primary" style="margin-top:1rem">返回用户列表</a>
+</div>
+{{else}}
+<div class="card" style="max-width:400px;margin:2rem auto">
+<h2 style="margin-bottom:1rem">创建新用户</h2>
+{{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+<form method="POST">
+<div class="form-group">
+<label>用户名</label>
+<input type="text" name="name" required placeholder="输入用户名">
+</div>
+<button class="btn btn-primary" style="width:100%">创建</button>
+</form>
+<a href="/admin/users" style="display:block;margin-top:1rem;text-align:center;color:#666">返回</a>
+</div>
+{{end}}
+{{end}}

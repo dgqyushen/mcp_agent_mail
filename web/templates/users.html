@@ -1,0 +1,44 @@
+{{template "base" .}}
+{{define "title"}}用户管理{{end}}
+{{define "content"}}
+<h2 style="margin-bottom:1rem">用户列表</h2>
+<div style="margin-bottom:1rem">
+<a href="/admin/users/create" class="btn btn-primary">创建用户</a>
+</div>
+<div class="card">
+<table>
+<thead><tr><th>ID</th><th>用户名</th><th>Token</th><th>操作</th></tr></thead>
+<tbody>
+{{range .}}
+<tr>
+<td>{{.ID}}</td><td>{{.Name}}</td>
+<td><code>{{.TokenPrefix}}</code></td>
+<td>
+<form method="POST" action="/admin/users/refresh" style="display:inline">
+<input type="hidden" name="user_id" value="{{.ID}}">
+<button class="btn btn-success" style="padding:.25rem .5rem;font-size:.85rem">刷新</button>
+</form>
+<form method="POST" action="/admin/users/delete" style="display:inline" onsubmit="return confirm('确认删除用户 {{.Name}}？')">
+<input type="hidden" name="user_id" value="{{.ID}}">
+<button class="btn btn-danger" style="padding:.25rem .5rem;font-size:.85rem">删除</button>
+</form>
+</td>
+</tr>
+{{end}}
+{{if not .}}
+<tr><td colspan="4" style="text-align:center;color:#999">暂无用户</td></tr>
+{{end}}
+</tbody>
+</table>
+</div>
+{{if .NewToken}}
+<div class="card">
+<h3>新 Token（仅显示一次！）</h3>
+<div class="token-box">{{.NewToken}}</div>
+<a href="/admin/users" class="btn btn-primary">返回用户列表</a>
+</div>
+{{end}}
+{{if .Error}}
+<div class="alert alert-error">{{.Error}}</div>
+{{end}}
+{{end}}

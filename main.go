@@ -9,6 +9,7 @@ import (
 	"agent-mail/mcp"
 	"agent-mail/service"
 	"agent-mail/store/sqlite"
+	"agent-mail/web"
 )
 
 func main() {
@@ -56,6 +57,9 @@ func main() {
 
 	handler := mcp.NewHandler(mailboxSvc, emailSvc, sendSvc, autoReplySvc, webhookSvc, attachmentSvc)
 	srv := mcp.NewServer(*addr, handler, userSvc)
+
+	adminHandler := web.NewAdminHandler(db, userSvc)
+	srv.RegisterAdmin(adminHandler.Register)
 
 	slog.Info("agent-mail starting", "addr", *addr)
 	if err := srv.Start(); err != nil {

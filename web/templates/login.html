@@ -1,0 +1,11 @@
+{{template "base" .}}
+{{define "content"}}
+<div class="card" style="max-width:400px;margin:4rem auto">
+<h2 style="margin-bottom:1rem">管理员登录</h2>
+{{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+<form method="POST">
+<input type="password" name="password" placeholder="管理员密码" required>
+<button class="btn btn-primary" style="width:100%">登录</button>
+</form>
+</div>
+{{end}}
