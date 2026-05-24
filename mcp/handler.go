@@ -175,6 +175,9 @@ func (h *Handler) listMailboxes() (*mcp.CallToolResult, error) {
 
 func (h *Handler) addMailbox(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
+	if err := requireArgs(args, "alias", "name", "base_url", "auth_data"); err != nil {
+		return errorResult(err), nil
+	}
 	err := h.mailbox.Add(
 		strArg(args, "alias"),
 		strArg(args, "name"),

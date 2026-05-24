@@ -108,7 +108,7 @@ site_password = "site-password-if-enabled"
   "mcpServers": {
     "agent-mail": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "-v", "~/.agent-mail:/root/.agent-mail:ro", "dgqyushen/agent-mail"]
+      "args": ["run", "-i", "--rm", "-e", "HOME=/root", "-v", "~/.agent-mail:/root/.agent-mail:ro", "dgqyushen/agent-mail"]
     }
   }
 }
@@ -162,7 +162,7 @@ site_password = "site-password-if-enabled"
 
 ```bash
 docker pull dgqyushen/agent-mail:latest
-docker run -i --rm -v ~/.agent-mail:/root/.agent-mail:ro dgqyushen/agent-mail
+docker run -i --rm -e HOME=/root -v ~/.agent-mail:/root/.agent-mail:ro dgqyushen/agent-mail
 ```
 
 Image: ~20MB (multi-stage, FROM scratch)

@@ -15,6 +15,8 @@ func main() {
 	addr := flag.String("addr", ":8080", "listen address for HTTP MCP server")
 	dbPath := flag.String("db-path", "", "path to SQLite database file (default: $HOME/.agent-mail/data.db)")
 	envFile := flag.String("env-file", "", "path to .env file")
+	authHeader := flag.String("auth-header", os.Getenv("AUTH_HEADER"), "HTTP header name for auth (env: AUTH_HEADER)")
+	authToken := flag.String("auth-token", os.Getenv("AUTH_TOKEN"), "auth token value (env: AUTH_TOKEN)")
 	flag.Parse()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
@@ -27,6 +29,13 @@ func main() {
 
 	if *envFile != "" {
 		loadEnvFile(*envFile)
+	}
+
+	if *authHeader != "" {
+		os.Setenv("AUTH_HEADER", *authHeader)
+	}
+	if *authToken != "" {
+		os.Setenv("AUTH_TOKEN", *authToken)
 	}
 
 	db, err := sqlite.Open(path)

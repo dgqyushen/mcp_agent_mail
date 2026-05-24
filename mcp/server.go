@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	mcp "github.com/mark3labs/mcp-go/mcp"
 	goserver "github.com/mark3labs/mcp-go/server"
@@ -16,8 +17,13 @@ type Server struct {
 
 func NewServer(addr string, handler *Handler) *Server {
 	return &Server{
-		httpServer: &http.Server{Addr: addr},
-		handler:    handler,
+		httpServer: &http.Server{
+			Addr:         addr,
+			ReadTimeout:  15 * time.Second,
+			WriteTimeout: 60 * time.Second,
+			IdleTimeout:  120 * time.Second,
+		},
+		handler: handler,
 	}
 }
 
@@ -33,7 +39,7 @@ func (s *Server) Start() error {
 	streamableServer := goserver.NewStreamableHTTPServer(mcpSrv)
 
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", streamableServer)
+	mux.Handle("/mcp", authMiddleware(streamableServer))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))

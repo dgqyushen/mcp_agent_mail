@@ -1,9 +1,13 @@
 services:
   agent-mail:
     image: dgqyushen/agent-mail:latest
-    command: --transport sse --addr :9090
+    command: ["--addr", ":8080", "--db-path", "/data/agent-mail.db"]
+    environment:
+      - HOME=/root
     ports:
-      - "9090:9090"
+      - "8080:8080"
     volumes:
-      - ~/.agent-mail:/root/.agent-mail:ro
-    restart: unless-stopped
+      - agent-mail-data:/data
+
+volumes:
+  agent-mail-data:
