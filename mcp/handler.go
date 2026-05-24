@@ -39,47 +39,48 @@ func NewHandler(
 }
 
 func (h *Handler) HandleToolCall(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID := GetUserID(ctx)
 	switch req.Params.Name {
 	case ToolListMailboxes:
-		return h.listMailboxes()
+		return h.listMailboxes(userID)
 	case ToolAddMailbox:
-		return h.addMailbox(req)
+		return h.addMailbox(userID, req)
 	case ToolRemoveMailbox:
-		return h.removeMailbox(req)
+		return h.removeMailbox(userID, req)
 	case ToolSwitchMailbox:
-		return h.switchMailbox(req)
+		return h.switchMailbox(userID, req)
 	case ToolValidateMailbox:
-		return h.validateMailbox(req)
+		return h.validateMailbox(userID, req)
 	case ToolListEmails:
-		return h.listEmails(req)
+		return h.listEmails(userID, req)
 	case ToolGetEmail:
-		return h.getEmail(req)
+		return h.getEmail(userID, req)
 	case ToolSearchEmails:
-		return h.searchEmails(req)
+		return h.searchEmails(userID, req)
 	case ToolDeleteEmail:
-		return h.deleteEmail(req)
+		return h.deleteEmail(userID, req)
 	case ToolClearInbox:
-		return h.clearInbox(req)
+		return h.clearInbox(userID, req)
 	case ToolSendMail:
-		return h.sendMail(req)
+		return h.sendMail(userID, req)
 	case ToolCheckBalance:
-		return h.checkBalance(req)
+		return h.checkBalance(userID, req)
 	case ToolListSent:
-		return h.listSent(req)
+		return h.listSent(userID, req)
 	case ToolDeleteSent:
-		return h.deleteSent(req)
+		return h.deleteSent(userID, req)
 	case ToolClearSent:
-		return h.clearSent(req)
+		return h.clearSent(userID, req)
 	case ToolGetAutoReply:
-		return h.getAutoReply(req)
+		return h.getAutoReply(userID, req)
 	case ToolSetAutoReply:
-		return h.setAutoReply(req)
+		return h.setAutoReply(userID, req)
 	case ToolGetWebhook:
-		return h.getWebhook(req)
+		return h.getWebhook(userID, req)
 	case ToolSetWebhook:
-		return h.setWebhook(req)
+		return h.setWebhook(userID, req)
 	case ToolListAttach:
-		return h.listAttachments(req)
+		return h.listAttachments(userID, req)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", req.Params.Name)
 	}
@@ -161,24 +162,23 @@ func errorResult(err error) *mcp.CallToolResult {
 	}
 }
 
-
-
 // --- handlers ---
 
-func (h *Handler) listMailboxes() (*mcp.CallToolResult, error) {
-	list, err := h.mailbox.List()
+func (h *Handler) listMailboxes(userID int) (*mcp.CallToolResult, error) {
+	list, err := h.mailbox.List(userID)
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(list), nil
 }
 
-func (h *Handler) addMailbox(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) addMailbox(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
 	if err := requireArgs(args, "alias", "name", "base_url", "auth_data"); err != nil {
 		return errorResult(err), nil
 	}
 	err := h.mailbox.Add(
+		userID,
 		strArg(args, "alias"),
 		strArg(args, "name"),
 		strArg(args, "provider_type"),
@@ -191,78 +191,78 @@ func (h *Handler) addMailbox(req mcp.CallToolRequest) (*mcp.CallToolResult, erro
 	return toResult(map[string]string{"status": "ok"}), nil
 }
 
-func (h *Handler) removeMailbox(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) removeMailbox(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	if err := h.mailbox.Remove(alias); err != nil {
+	if err := h.mailbox.Remove(userID, alias); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]string{"status": "ok"}), nil
 }
 
-func (h *Handler) switchMailbox(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) switchMailbox(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	if err := h.mailbox.Switch(alias); err != nil {
+	if err := h.mailbox.Switch(userID, alias); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]string{"status": "switched", "alias": alias}), nil
 }
 
-func (h *Handler) validateMailbox(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) validateMailbox(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	settings, err := h.mailbox.Validate(alias)
+	settings, err := h.mailbox.Validate(userID, alias)
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(settings), nil
 }
 
-func (h *Handler) listEmails(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) listEmails(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
-	result, err := h.email.List(strArg(args, "alias"), intArg(args, "limit"), intArg(args, "offset"))
+	result, err := h.email.List(userID, strArg(args, "alias"), intArg(args, "limit"), intArg(args, "offset"))
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(result), nil
 }
 
-func (h *Handler) getEmail(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) getEmail(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
-	result, err := h.email.Get(strArg(args, "alias"), intArg(args, "id"))
+	result, err := h.email.Get(userID, strArg(args, "alias"), intArg(args, "id"))
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(result), nil
 }
 
-func (h *Handler) searchEmails(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) searchEmails(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
-	result, err := h.email.Search(strArg(args, "alias"), strArg(args, "query"), intArg(args, "limit"))
+	result, err := h.email.Search(userID, strArg(args, "alias"), strArg(args, "query"), intArg(args, "limit"))
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(result), nil
 }
 
-func (h *Handler) deleteEmail(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) deleteEmail(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
 	if err := requireArgs(args, "id"); err != nil {
 		return errorResult(err), nil
 	}
-	if err := h.email.Delete(strArg(args, "alias"), intArg(args, "id")); err != nil {
+	if err := h.email.Delete(userID, strArg(args, "alias"), intArg(args, "id")); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]any{"status": "deleted", "id": intArg(args, "id")}), nil
 }
 
-func (h *Handler) clearInbox(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) clearInbox(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	if err := h.email.Clear(alias); err != nil {
+	if err := h.email.Clear(userID, alias); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]string{"status": "inbox cleared"}), nil
 }
 
-func (h *Handler) sendMail(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) sendMail(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
 	if err := requireArgs(args, "to_mail", "subject", "content"); err != nil {
 		return errorResult(err), nil
@@ -275,59 +275,59 @@ func (h *Handler) sendMail(req mcp.CallToolRequest) (*mcp.CallToolResult, error)
 		Content:  strArg(args, "content"),
 		IsHTML:   boolArg(args, "is_html"),
 	}
-	if err := h.send.Send(strArg(args, "alias"), body); err != nil {
+	if err := h.send.Send(userID, strArg(args, "alias"), body); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]string{"status": "sent"}), nil
 }
 
-func (h *Handler) checkBalance(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) checkBalance(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	balance, err := h.send.CheckBalance(alias)
+	balance, err := h.send.CheckBalance(userID, alias)
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]int{"balance": balance}), nil
 }
 
-func (h *Handler) listSent(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) listSent(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
-	result, err := h.send.ListSent(strArg(args, "alias"), intArg(args, "limit"), intArg(args, "offset"))
+	result, err := h.send.ListSent(userID, strArg(args, "alias"), intArg(args, "limit"), intArg(args, "offset"))
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(result), nil
 }
 
-func (h *Handler) deleteSent(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) deleteSent(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
 	if err := requireArgs(args, "id"); err != nil {
 		return errorResult(err), nil
 	}
-	if err := h.send.DeleteSent(strArg(args, "alias"), intArg(args, "id")); err != nil {
+	if err := h.send.DeleteSent(userID, strArg(args, "alias"), intArg(args, "id")); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]any{"status": "deleted", "id": intArg(args, "id")}), nil
 }
 
-func (h *Handler) clearSent(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) clearSent(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	if err := h.send.ClearSent(alias); err != nil {
+	if err := h.send.ClearSent(userID, alias); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]string{"status": "sent items cleared"}), nil
 }
 
-func (h *Handler) getAutoReply(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) getAutoReply(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	cfg, err := h.autoReply.Get(alias)
+	cfg, err := h.autoReply.Get(userID, alias)
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(cfg), nil
 }
 
-func (h *Handler) setAutoReply(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) setAutoReply(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
 	if err := requireArgs(args, "enabled"); err != nil {
 		return errorResult(err), nil
@@ -339,22 +339,22 @@ func (h *Handler) setAutoReply(req mcp.CallToolRequest) (*mcp.CallToolResult, er
 		Message:      strArg(args, "message"),
 		Enabled:      boolArg(args, "enabled"),
 	}
-	if err := h.autoReply.Set(strArg(args, "alias"), cfg); err != nil {
+	if err := h.autoReply.Set(userID, strArg(args, "alias"), cfg); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]string{"status": "ok"}), nil
 }
 
-func (h *Handler) getWebhook(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) getWebhook(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	cfg, err := h.webhook.Get(alias)
+	cfg, err := h.webhook.Get(userID, alias)
 	if err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(cfg), nil
 }
 
-func (h *Handler) setWebhook(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) setWebhook(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := getArgs(req)
 	if err := requireArgs(args, "url", "events"); err != nil {
 		return errorResult(err), nil
@@ -373,15 +373,15 @@ func (h *Handler) setWebhook(req mcp.CallToolRequest) (*mcp.CallToolResult, erro
 		URL:    strArg(args, "url"),
 		Events: events,
 	}
-	if err := h.webhook.Set(strArg(args, "alias"), cfg); err != nil {
+	if err := h.webhook.Set(userID, strArg(args, "alias"), cfg); err != nil {
 		return errorResult(err), nil
 	}
 	return toResult(map[string]string{"status": "ok"}), nil
 }
 
-func (h *Handler) listAttachments(req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (h *Handler) listAttachments(userID int, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	alias := strArg(getArgs(req), "alias")
-	result, err := h.attachment.List(alias)
+	result, err := h.attachment.List(userID, alias)
 	if err != nil {
 		return errorResult(err), nil
 	}

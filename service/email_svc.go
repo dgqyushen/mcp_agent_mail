@@ -15,39 +15,39 @@ func NewEmailService(ms *MailboxService) *EmailService {
 	return &EmailService{mailboxSvc: ms}
 }
 
-func (s *EmailService) List(alias string, limit, offset int) (*model.PaginatedResult, error) {
-	p, err := s.mailboxSvc.Provider(alias)
+func (s *EmailService) List(userID int, alias string, limit, offset int) (*model.PaginatedResult, error) {
+	p, err := s.mailboxSvc.Provider(userID, alias)
 	if err != nil {
 		return nil, err
 	}
 	return p.ListEmails(limit, offset)
 }
 
-func (s *EmailService) Get(alias string, id int) (*model.ParsedMail, error) {
-	p, err := s.mailboxSvc.Provider(alias)
+func (s *EmailService) Get(userID int, alias string, id int) (*model.ParsedMail, error) {
+	p, err := s.mailboxSvc.Provider(userID, alias)
 	if err != nil {
 		return nil, err
 	}
 	return p.GetEmail(id)
 }
 
-func (s *EmailService) Delete(alias string, id int) error {
-	p, err := s.mailboxSvc.Provider(alias)
+func (s *EmailService) Delete(userID int, alias string, id int) error {
+	p, err := s.mailboxSvc.Provider(userID, alias)
 	if err != nil {
 		return err
 	}
 	return p.DeleteEmail(id)
 }
 
-func (s *EmailService) Clear(alias string) error {
-	p, err := s.mailboxSvc.Provider(alias)
+func (s *EmailService) Clear(userID int, alias string) error {
+	p, err := s.mailboxSvc.Provider(userID, alias)
 	if err != nil {
 		return err
 	}
 	return p.ClearInbox()
 }
 
-func (s *EmailService) Search(alias, query string, limit int) (*model.PaginatedResult, error) {
+func (s *EmailService) Search(userID int, alias, query string, limit int) (*model.PaginatedResult, error) {
 	q := strings.TrimSpace(query)
 	if q == "" {
 		return &model.PaginatedResult{}, nil
@@ -55,7 +55,7 @@ func (s *EmailService) Search(alias, query string, limit int) (*model.PaginatedR
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
-	p, err := s.mailboxSvc.Provider(alias)
+	p, err := s.mailboxSvc.Provider(userID, alias)
 	if err != nil {
 		return nil, err
 	}

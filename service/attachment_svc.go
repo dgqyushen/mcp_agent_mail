@@ -10,8 +10,8 @@ func NewAttachmentService(ms *MailboxService) *AttachmentService {
 	return &AttachmentService{mailboxSvc: ms}
 }
 
-func (s *AttachmentService) List(alias string) (*model.AttachmentListResult, error) {
-	p, err := s.mailboxSvc.Provider(alias)
+func (s *AttachmentService) List(userID int, alias string) (*model.AttachmentListResult, error) {
+	p, err := s.mailboxSvc.Provider(userID, alias)
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,6 @@ package service
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 
 	"agent-mail/model"
 	"agent-mail/provider"
@@ -42,11 +41,12 @@ func NewMailboxService(db *sqlite.DB, factory ProviderFactory) *MailboxService {
 	return &MailboxService{db: db, factory: factory}
 }
 
-func (s *MailboxService) Add(alias, name, providerType, baseURL, authData string) error {
+func (s *MailboxService) Add(userID int, alias, name, providerType, baseURL, authData string) error {
 	if providerType == "" {
 		providerType = "cloudflare"
 	}
 	rec := model.MailboxRecord{
+		UserID:       userID,
 		Alias:        alias,
 		Name:         name,
 		ProviderType: providerType,
@@ -56,59 +56,45 @@ func (s *MailboxService) Add(alias, name, providerType, baseURL, authData string
 	if err := s.db.InsertMailbox(rec); err != nil {
 		return fmt.Errorf("add mailbox: %w", err)
 	}
-	defAlias, err := s.db.GetSetting("default_mailbox")
-	if err != nil {
-		slog.Warn("failed to read default mailbox setting", "error", err)
-	} else if defAlias == "" {
-		if err := s.db.SetSetting("default_mailbox", alias); err != nil {
-			slog.Warn("failed to set default mailbox", "alias", alias, "error", err)
-		}
+	dk := fmt.Sprintf("default_mailbox_%d", userID)
+	defAlias, _ := s.db.GetSetting(dk)
+	if defAlias == "" {
+		s.db.SetSetting(dk, alias)
 	}
 	return nil
 }
 
-func (s *MailboxService) Remove(alias string) error {
-	if err := s.db.DeleteMailbox(0, alias); err != nil {
+func (s *MailboxService) Remove(userID int, alias string) error {
+	if err := s.db.DeleteMailbox(userID, alias); err != nil {
 		return fmt.Errorf("remove mailbox: %w", err)
 	}
-	defAlias, err := s.db.GetSetting("default_mailbox")
-	if err != nil {
-		slog.Warn("failed to read default mailbox", "error", err)
-		return nil
-	}
+	dk := fmt.Sprintf("default_mailbox_%d", userID)
+	defAlias, _ := s.db.GetSetting(dk)
 	if defAlias == alias {
-		list, err := s.db.ListMailboxes(0)
-		if err != nil {
-			slog.Warn("failed to list mailboxes for fallback", "error", err)
-			return nil
-		}
+		list, _ := s.db.ListMailboxes(userID)
 		if len(list) > 0 {
-			if err := s.db.SetSetting("default_mailbox", list[0].Alias); err != nil {
-				slog.Warn("failed to set fallback default mailbox", "alias", list[0].Alias, "error", err)
-			}
+			s.db.SetSetting(dk, list[0].Alias)
 		} else {
-			if err := s.db.SetSetting("default_mailbox", ""); err != nil {
-				slog.Warn("failed to clear default mailbox", "error", err)
-			}
+			s.db.SetSetting(dk, "")
 		}
 	}
 	return nil
 }
 
-func (s *MailboxService) Switch(alias string) error {
-	if _, err := s.db.GetMailbox(0, alias); err != nil {
+func (s *MailboxService) Switch(userID int, alias string) error {
+	if _, err := s.db.GetMailbox(userID, alias); err != nil {
 		return fmt.Errorf("switch mailbox: %w", err)
 	}
-	return s.db.SetSetting("default_mailbox", alias)
+	return s.db.SetSetting(fmt.Sprintf("default_mailbox_%d", userID), alias)
 }
 
-func (s *MailboxService) Default() string {
-	v, _ := s.db.GetSetting("default_mailbox")
+func (s *MailboxService) Default(userID int) string {
+	v, _ := s.db.GetSetting(fmt.Sprintf("default_mailbox_%d", userID))
 	return v
 }
 
-func (s *MailboxService) List() ([]model.MailboxInfo, error) {
-	records, err := s.db.ListMailboxes(0)
+func (s *MailboxService) List(userID int) ([]model.MailboxInfo, error) {
+	records, err := s.db.ListMailboxes(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +116,8 @@ func (s *MailboxService) List() ([]model.MailboxInfo, error) {
 	return infos, nil
 }
 
-func (s *MailboxService) Validate(alias string) (*model.SettingsResponse, error) {
-	rec, err := s.Resolve(alias)
+func (s *MailboxService) Validate(userID int, alias string) (*model.SettingsResponse, error) {
+	rec, err := s.Resolve(userID, alias)
 	if err != nil {
 		return nil, err
 	}
@@ -142,15 +128,15 @@ func (s *MailboxService) Validate(alias string) (*model.SettingsResponse, error)
 	return p.GetSettings()
 }
 
-func (s *MailboxService) Resolve(alias string) (*model.MailboxRecord, error) {
+func (s *MailboxService) Resolve(userID int, alias string) (*model.MailboxRecord, error) {
 	if alias == "" {
-		alias = s.Default()
+		alias = s.Default(userID)
 	}
-	return s.db.GetMailbox(0, alias)
+	return s.db.GetMailbox(userID, alias)
 }
 
-func (s *MailboxService) Provider(alias string) (provider.EmailProvider, error) {
-	rec, err := s.Resolve(alias)
+func (s *MailboxService) Provider(userID int, alias string) (provider.EmailProvider, error) {
+	rec, err := s.Resolve(userID, alias)
 	if err != nil {
 		return nil, err
 	}

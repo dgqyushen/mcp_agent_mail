@@ -52,9 +52,10 @@ func main() {
 	autoReplySvc := service.NewAutoReplyService(mailboxSvc)
 	webhookSvc := service.NewWebhookService(mailboxSvc)
 	attachmentSvc := service.NewAttachmentService(mailboxSvc)
+	userSvc := service.NewUserService(db)
 
 	handler := mcp.NewHandler(mailboxSvc, emailSvc, sendSvc, autoReplySvc, webhookSvc, attachmentSvc)
-	srv := mcp.NewServer(*addr, handler)
+	srv := mcp.NewServer(*addr, handler, userSvc)
 
 	slog.Info("agent-mail starting", "addr", *addr)
 	if err := srv.Start(); err != nil {

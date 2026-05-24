@@ -102,7 +102,7 @@ func setupHandler(t *testing.T) *Handler {
 	}
 	t.Cleanup(func() { db.Close() })
 	ms := service.NewMailboxService(db, nil)
-	ms.Add("test", "Test", "cloudflare", "https://mail.example.com", `{"jwt":"tok","site_password":""}`)
+	ms.Add(0, "test", "Test", "cloudflare", "https://mail.example.com", `{"jwt":"tok","site_password":""}`)
 	return NewHandler(
 		ms,
 		service.NewEmailService(ms),

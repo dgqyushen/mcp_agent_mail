@@ -28,12 +28,12 @@ func TestMailboxServiceAddList(t *testing.T) {
 
 	svc := service.NewMailboxService(db, &testProviderFactory{})
 
-	err = svc.Add("work", "Work", "cloudflare", "https://mail.example.com", `{"jwt":"token123"}`)
+	err = svc.Add(1, "work", "Work", "cloudflare", "https://mail.example.com", `{"jwt":"token123"}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	list, err := svc.List()
+	list, err := svc.List(1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,17 +54,17 @@ func TestMailboxServiceSwitchDefault(t *testing.T) {
 
 	svc := service.NewMailboxService(db, &testProviderFactory{})
 
-	svc.Add("a", "A", "cloudflare", "https://a.com", "{}")
-	svc.Add("b", "B", "cloudflare", "https://b.com", "{}")
+	svc.Add(1, "a", "A", "cloudflare", "https://a.com", "{}")
+	svc.Add(1, "b", "B", "cloudflare", "https://b.com", "{}")
 
-	if def := svc.Default(); def != "a" {
+	if def := svc.Default(1); def != "a" {
 		t.Errorf("expected default a, got %q", def)
 	}
 
-	if err := svc.Switch("b"); err != nil {
+	if err := svc.Switch(1, "b"); err != nil {
 		t.Fatal(err)
 	}
-	if def := svc.Default(); def != "b" {
+	if def := svc.Default(1); def != "b" {
 		t.Errorf("expected default b after switch, got %q", def)
 	}
 }
@@ -78,18 +78,18 @@ func TestMailboxServiceRemove(t *testing.T) {
 
 	svc := service.NewMailboxService(db, &testProviderFactory{})
 
-	svc.Add("a", "A", "cloudflare", "https://a.com", "{}")
-	svc.Add("b", "B", "cloudflare", "https://b.com", "{}")
+	svc.Add(1, "a", "A", "cloudflare", "https://a.com", "{}")
+	svc.Add(1, "b", "B", "cloudflare", "https://b.com", "{}")
 
-	if err := svc.Remove("a"); err != nil {
+	if err := svc.Remove(1, "a"); err != nil {
 		t.Fatal(err)
 	}
 	// Default should fallback to remaining one
-	if def := svc.Default(); def != "b" {
+	if def := svc.Default(1); def != "b" {
 		t.Errorf("expected default b after removing a, got %q", def)
 	}
 
-	list, _ := svc.List()
+	list, _ := svc.List(1)
 	if len(list) != 1 {
 		t.Errorf("expected 1 mailbox after remove, got %d", len(list))
 	}
@@ -104,9 +104,9 @@ func TestMailboxServiceResolve(t *testing.T) {
 
 	svc := service.NewMailboxService(db, &testProviderFactory{})
 
-	svc.Add("work", "Work", "cloudflare", "https://mail.example.com", `{"jwt":"token123"}`)
+	svc.Add(1, "work", "Work", "cloudflare", "https://mail.example.com", `{"jwt":"token123"}`)
 
-	rec, err := svc.Resolve("work")
+	rec, err := svc.Resolve(1, "work")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestMailboxServiceResolve(t *testing.T) {
 	}
 
 	// Resolve with empty should use default
-	rec, err = svc.Resolve("")
+	rec, err = svc.Resolve(1, "")
 	if err != nil {
 		t.Fatal(err)
 	}

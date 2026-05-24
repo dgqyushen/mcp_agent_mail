@@ -8,14 +8,18 @@ import (
 
 	mcp "github.com/mark3labs/mcp-go/mcp"
 	goserver "github.com/mark3labs/mcp-go/server"
+
+	"agent-mail/service"
 )
 
 type Server struct {
 	httpServer *http.Server
 	handler    *Handler
+	userSvc    *service.UserService
+	mux        *http.ServeMux
 }
 
-func NewServer(addr string, handler *Handler) *Server {
+func NewServer(addr string, handler *Handler, userSvc *service.UserService) *Server {
 	return &Server{
 		httpServer: &http.Server{
 			Addr:         addr,
@@ -24,8 +28,11 @@ func NewServer(addr string, handler *Handler) *Server {
 			IdleTimeout:  120 * time.Second,
 		},
 		handler: handler,
+		userSvc: userSvc,
 	}
 }
+
+func (s *Server) ServeMux() *http.ServeMux { return s.mux }
 
 func (s *Server) Start() error {
 	mcpSrv := goserver.NewMCPServer("agent-mail", "1.0.0")
@@ -39,12 +46,13 @@ func (s *Server) Start() error {
 	streamableServer := goserver.NewStreamableHTTPServer(mcpSrv)
 
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", authMiddleware(streamableServer))
+	mux.Handle("/mcp", AuthMiddleware(streamableServer, s.userSvc))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	s.mux = mux
 	s.httpServer.Handler = mux
 	slog.Info("MCP server starting", "addr", s.httpServer.Addr)
 	return s.httpServer.ListenAndServe()
