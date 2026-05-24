@@ -400,6 +400,91 @@ func (s *Server) handleClearSent(ctx context.Context, req mcp.CallToolRequest) (
 	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
 }
 
+func (s *Server) handleGetAutoReply(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	cfg, err := c.GetAutoReply()
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(cfg)), nil
+}
+
+func (s *Server) handleSetAutoReply(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	cfg := &model.AutoReplyConfig{}
+	if v := req.GetString("subject", ""); v != "" {
+		cfg.Subject = v
+	}
+	if v := req.GetString("message", ""); v != "" {
+		cfg.Message = v
+	}
+	if v := req.GetString("enabled", ""); v != "" {
+		enabled, err := strconv.ParseBool(v)
+		if err != nil {
+			return mcp.NewToolResultError("invalid enabled: must be true or false"), nil
+		}
+		cfg.Enabled = enabled
+	}
+	if v := req.GetString("name", ""); v != "" {
+		cfg.Name = v
+	}
+	if err := c.SetAutoReply(cfg); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
+}
+
+func (s *Server) handleGetWebhook(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	cfg, err := c.GetWebhook()
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(cfg)), nil
+}
+
+func (s *Server) handleSetWebhook(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	url, err := req.RequireString("url")
+	if err != nil || strings.TrimSpace(url) == "" {
+		return mcp.NewToolResultError("missing or empty required parameter: url"), nil
+	}
+	cfg := &model.WebhookSettings{URL: url}
+	if err := c.SetWebhook(cfg); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
+}
+
+func (s *Server) handleListAttachments(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	result, err := c.ListAttachments()
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(result)), nil
+}
+
 func (s *Server) registerTools() {
 	s.mcpServer.AddTool(listMailboxesTool, s.handleListMailboxes)
 	s.mcpServer.AddTool(addMailboxTool, s.handleAddMailbox)
@@ -416,6 +501,11 @@ func (s *Server) registerTools() {
 	s.mcpServer.AddTool(listSentTool, s.handleListSent)
 	s.mcpServer.AddTool(deleteSentTool, s.handleDeleteSent)
 	s.mcpServer.AddTool(clearSentTool, s.handleClearSent)
+	s.mcpServer.AddTool(getAutoReplyTool, s.handleGetAutoReply)
+	s.mcpServer.AddTool(setAutoReplyTool, s.handleSetAutoReply)
+	s.mcpServer.AddTool(getWebhookTool, s.handleGetWebhook)
+	s.mcpServer.AddTool(setWebhookTool, s.handleSetWebhook)
+	s.mcpServer.AddTool(listAttachmentsTool, s.handleListAttachments)
 }
 
 func toJSON(v interface{}) string {
@@ -539,5 +629,35 @@ var deleteSentTool = mcp.NewTool("delete_sent",
 
 var clearSentTool = mcp.NewTool("clear_sent",
 	mcp.WithDescription("Delete all sent email records"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+)
+
+var getAutoReplyTool = mcp.NewTool("get_auto_reply",
+	mcp.WithDescription("Get the auto-reply configuration for the mailbox"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+)
+
+var setAutoReplyTool = mcp.NewTool("set_auto_reply",
+	mcp.WithDescription("Configure auto-reply settings"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+	mcp.WithString("subject", mcp.Description("Auto-reply subject")),
+	mcp.WithString("message", mcp.Description("Auto-reply message body")),
+	mcp.WithString("enabled", mcp.Description("Enable auto-reply (true/false)")),
+	mcp.WithString("name", mcp.Description("Auto-reply sender name")),
+)
+
+var getWebhookTool = mcp.NewTool("get_webhook",
+	mcp.WithDescription("Get the webhook configuration for the mailbox"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+)
+
+var setWebhookTool = mcp.NewTool("set_webhook",
+	mcp.WithDescription("Configure webhook settings"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+	mcp.WithString("url", mcp.Required(), mcp.Description("Webhook URL to receive notifications")),
+)
+
+var listAttachmentsTool = mcp.NewTool("list_attachments",
+	mcp.WithDescription("List S3 attachments for the mailbox"),
 	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
 )
