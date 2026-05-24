@@ -63,7 +63,7 @@ func NewProvider(record model.MailboxRecord) (*provider.MailProvider, error) {
 	}
 
 	return &provider.MailProvider{
-		Receiver: &GmailReceiver{svc: svc},
-		Sender:   &GmailSender{svc: svc},
+		Receiver: &GmailReceiver{srv: svc, auth: auth},
+		Sender:   &GmailSender{srv: svc, auth: auth},
 	}, nil
 }
