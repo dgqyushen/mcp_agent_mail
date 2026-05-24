@@ -1,0 +1,10 @@
+{{define "content"}}
+<div class="card" style="max-width:400px;margin:4rem auto">
+<h2 style="margin-bottom:1rem">用户登录</h2>
+{{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+<form method="POST">
+<input type="text" name="token" placeholder="输入您的 Token (atm-xxx...)" required style="font-family:monospace">
+<button class="btn btn-primary" style="width:100%">登录</button>
+</form>
+</div>
+{{end}}
