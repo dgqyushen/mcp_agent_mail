@@ -1,0 +1,6 @@
+services:
+  agent-mail:
+    build: .
+    volumes:
+      - ~/.agent-mail:/root/.agent-mail
+    restart: unless-stopped
