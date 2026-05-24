@@ -12,10 +12,24 @@ import (
 	"agent-mail/store/sqlite"
 )
 
-//go:embed templates/*.html
+//go:embed templates/base.html templates/*.html
 var templateFS embed.FS
 
-var tmpl = template.Must(template.ParseFS(templateFS, "templates/*.html"))
+type pageSet struct {
+	*template.Template
+}
+
+var pages = map[string]*pageSet{
+	"login":      parsePage("login.html"),
+	"users":      parsePage("users.html"),
+	"usercreate": parsePage("user_create.html"),
+}
+
+func parsePage(file string) *pageSet {
+	return &pageSet{
+		template.Must(template.Must(template.New("").ParseFS(templateFS, "templates/base.html")).ParseFS(templateFS, "templates/"+file)),
+	}
+}
 
 type AdminHandler struct {
 	userSvc *service.UserService
@@ -60,13 +74,13 @@ func (h *AdminHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func (h *AdminHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		tmpl.ExecuteTemplate(w, "login.html", nil)
+		pages["login"].ExecuteTemplate(w, "base", nil)
 		return
 	}
 	password := r.FormValue("password")
 	storedHash, _ := h.db.GetSetting("admin_password_hash")
 	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password)); err != nil {
-		tmpl.ExecuteTemplate(w, "login.html", map[string]string{"Error": "密码错误"})
+		pages["login"].ExecuteTemplate(w, "base", map[string]string{"Error": "密码错误"})
 		return
 	}
 	setSession(w)
@@ -90,21 +104,21 @@ func (h *AdminHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
 			TokenPrefix: h.userSvc.GetActiveTokenPrefix(u.ID),
 		})
 	}
-	tmpl.ExecuteTemplate(w, "users.html", data)
+	pages["users"].ExecuteTemplate(w, "base", data)
 }
 
 func (h *AdminHandler) handleUserCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		tmpl.ExecuteTemplate(w, "user_create.html", nil)
+		pages["usercreate"].ExecuteTemplate(w, "base", nil)
 		return
 	}
 	name := r.FormValue("name")
 	u, token, err := h.userSvc.CreateUser(name)
 	if err != nil {
-		tmpl.ExecuteTemplate(w, "user_create.html", map[string]string{"Error": err.Error()})
+		pages["usercreate"].ExecuteTemplate(w, "base", map[string]string{"Error": err.Error()})
 		return
 	}
-	tmpl.ExecuteTemplate(w, "user_create.html", map[string]any{
+	pages["usercreate"].ExecuteTemplate(w, "base", map[string]any{
 		"Success": true,
 		"Name":    u.Name,
 		"Token":   token,
@@ -123,10 +137,10 @@ func (h *AdminHandler) handleTokenRefresh(w http.ResponseWriter, r *http.Request
 	}
 	token, err := h.userSvc.RefreshToken(userID)
 	if err != nil {
-		tmpl.ExecuteTemplate(w, "users.html", map[string]string{"Error": err.Error()})
+		pages["users"].ExecuteTemplate(w, "base", map[string]string{"Error": err.Error()})
 		return
 	}
-	tmpl.ExecuteTemplate(w, "users.html", map[string]any{"NewToken": token})
+	pages["users"].ExecuteTemplate(w, "base", map[string]any{"NewToken": token})
 }
 
 func (h *AdminHandler) handleUserDelete(w http.ResponseWriter, r *http.Request) {
