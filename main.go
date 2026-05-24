@@ -1,10 +1,14 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"log/slog"
 	"os"
 	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"agent-mail/mcp"
 	"agent-mail/service"
@@ -47,6 +51,8 @@ func main() {
 	defer db.Close()
 	slog.Info("database opened", "path", path)
 
+	initAdminPassword(db)
+
 	mailboxSvc := service.NewMailboxService(db, nil)
 	emailSvc := service.NewEmailService(mailboxSvc)
 	sendSvc := service.NewSendService(mailboxSvc)
@@ -66,6 +72,30 @@ func main() {
 		slog.Error("server failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+func initAdminPassword(db *sqlite.DB) {
+	stored, err := db.GetSetting("admin_password_hash")
+	if err != nil {
+		slog.Error("failed to read admin password", "error", err)
+		os.Exit(1)
+	}
+	if stored != "" {
+		return
+	}
+	password := os.Getenv("ADMIN_PASSWORD")
+	if password == "" {
+		b := make([]byte, 16)
+		rand.Read(b)
+		password = hex.EncodeToString(b)
+		slog.Warn("ADMIN_PASSWORD not set, generated random password", "password", password)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		slog.Error("failed to hash admin password", "error", err)
+		os.Exit(1)
+	}
+	db.SetSetting("admin_password_hash", string(hash))
 }
 
 func loadEnvFile(path string) {
