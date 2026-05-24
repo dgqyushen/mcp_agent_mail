@@ -51,6 +51,10 @@ func (s *Server) saveConfig() error {
 	return config.Save(s.cfgPath, s.cfg)
 }
 
+func (s *Server) MCPServer() *server.MCPServer {
+	return s.mcpServer
+}
+
 func (s *Server) ServeStdio() error {
 	return server.ServeStdio(s.mcpServer)
 }

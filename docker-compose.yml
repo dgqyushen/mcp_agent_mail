@@ -1,6 +1,9 @@
 services:
   agent-mail:
     build: .
+    command: --transport sse --addr :8080
+    ports:
+      - "8080:8080"
     volumes:
       - ~/.agent-mail:/root/.agent-mail
     restart: unless-stopped
