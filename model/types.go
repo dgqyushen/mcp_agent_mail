@@ -6,15 +6,15 @@ import (
 )
 
 type MailboxConfig struct {
-	Name         string `json:"name"`
-	BaseURL      string `json:"base_url"`
-	JWT          string `json:"jwt"`
-	SitePassword string `json:"site_password"`
+	Name         string `json:"name" toml:"name"`
+	BaseURL      string `json:"base_url" toml:"base_url"`
+	JWT          string `json:"jwt" toml:"jwt"`
+	SitePassword string `json:"site_password" toml:"site_password"`
 }
 
 type Config struct {
-	DefaultMailbox string                   `json:"default_mailbox"`
-	Mailboxes      map[string]MailboxConfig `json:"mailboxes"`
+	DefaultMailbox string                   `json:"default_mailbox" toml:"default_mailbox"`
+	Mailboxes      map[string]MailboxConfig `json:"mailboxes" toml:"mailboxes"`
 }
 
 type SettingsResponse struct {
@@ -115,5 +115,5 @@ type ConfigPathFunc func() string
 
 var DefaultConfigPath = func() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".agent-mail", "config.json")
+	return filepath.Join(home, ".agent-mail", "config.toml")
 }

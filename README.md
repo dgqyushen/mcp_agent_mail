@@ -11,36 +11,31 @@ MCP (Model Context Protocol) server that wraps [cloudflare_temp_email](https://g
 ```bash
 # 1. Create config on VPS
 mkdir -p ~/.agent-mail
-cat > ~/.agent-mail/config.json << 'EOF'
-{
-  "default_mailbox": "work",
-  "mailboxes": {
-    "work": {
-      "name": "工作邮箱",
-      "base_url": "https://mail.your-domain.com",
-      "jwt": "your-address-jwt-here",
-      "site_password": ""
-    }
-  }
-}
+cat > ~/.agent-mail/config.toml << 'EOF'
+default_mailbox = "work"
+
+[mailboxes.work]
+name = "工作邮箱"
+base_url = "https://mail.your-domain.com"
+jwt = "your-address-jwt-here"
 EOF
 
 # 2. Clone and build
 git clone <repo-url> agent-mail && cd agent-mail
 CGO_ENABLED=0 go build -o agent-mail .
 
-# 3. Run on VPS (SSE on :8080)
-./agent-mail --transport sse --addr :8080
+# 3. Run on VPS (SSE on :9090)
+./agent-mail --transport sse --addr :9090
 
 # Or with Docker
-docker compose up -d --build
+docker compose up -d
 ```
 
 ### Local (stdio)
 
 ```bash
 ./agent-mail                          # default: --transport stdio
-./agent-mail --config /path/to/config.json
+./agent-mail --config /path/to/config.toml
 ```
 
 ## Transport Modes
@@ -55,20 +50,21 @@ Use `--addr` to set listen address (default `:8080`).
 
 ## Configuration
 
-`~/.agent-mail/config.json`:
+`~/.agent-mail/config.toml`:
 
-```json
-{
-  "default_mailbox": "work",
-  "mailboxes": {
-    "work": {
-      "name": "工作邮箱",
-      "base_url": "https://mail.your-domain.com",
-      "jwt": "eyJhbGciOiJIUzI1NiIs...",
-      "site_password": ""
-    }
-  }
-}
+```toml
+default_mailbox = "work"
+
+[mailboxes.work]
+name = "工作邮箱"
+base_url = "https://mail.your-domain.com"
+jwt = "eyJhbGciOiJIUzI1NiIs..."
+
+[mailboxes.personal]
+name = "个人邮箱"
+base_url = "https://mail.your-domain.com"
+jwt = "eyJhbGciOiJIUzI1NiIs..."
+site_password = "site-password-if-enabled"
 ```
 
 | Field | Required | Description |
@@ -121,7 +117,7 @@ Use `--addr` to set listen address (default `:8080`).
 ## Security Notes
 
 - **VPS**: Put agent-mail behind nginx/Caddy with HTTPS + basic auth, then use `https://vps.example.com/sse` as the agent URL
-- **JWT**: Never commit `config.json`. The file is mode `0600`, directory `0700`
+- **JWT**: Never commit `config.toml`. The file is auto-created with mode `0600`, directory `0700`
 - No auth built into the SSE endpoint — agents trust the network layer
 
 ## MCP Tools (20)

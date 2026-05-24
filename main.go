@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	cfgPath := flag.String("config", "", "path to config file (default: ~/.agent-mail/config.json)")
+	cfgPath := flag.String("config", "", "path to config file (default: ~/.agent-mail/config.toml)")
 	transport := flag.String("transport", "stdio", "transport mode: stdio, sse, streamable-http")
 	addr := flag.String("addr", ":8080", "listen address for HTTP based transport")
 	flag.Parse()

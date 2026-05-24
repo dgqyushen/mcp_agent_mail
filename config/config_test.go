@@ -9,7 +9,7 @@ import (
 )
 
 func TestLoad_FileNotExists(t *testing.T) {
-	cfg, err := Load("/tmp/nonexistent/config.json")
+	cfg, err := Load("/tmp/nonexistent/config.toml")
 	if err != nil {
 		t.Fatalf("expected nil error for missing file, got %v", err)
 	}
@@ -23,11 +23,12 @@ func TestLoad_FileNotExists(t *testing.T) {
 
 func TestSaveAndLoad(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "config.json")
+	path := filepath.Join(dir, "config.toml")
 	cfg := &model.Config{
 		DefaultMailbox: "work",
 		Mailboxes: map[string]model.MailboxConfig{
-			"work": {Name: "Work", BaseURL: "https://mail.example.com", JWT: "jwt123"},
+			"work":       {Name: "Work", BaseURL: "https://mail.example.com", JWT: "jwt123"},
+			"newsletter": {Name: "Newsletter", BaseURL: "https://mail.example.com", JWT: "jwt456"},
 		},
 	}
 	if err := Save(path, cfg); err != nil {
@@ -40,6 +41,9 @@ func TestSaveAndLoad(t *testing.T) {
 	if loaded.DefaultMailbox != "work" {
 		t.Fatalf("expected default=work, got %q", loaded.DefaultMailbox)
 	}
+	if len(loaded.Mailboxes) != 2 {
+		t.Fatalf("expected 2 mailboxes, got %d", len(loaded.Mailboxes))
+	}
 	mb, ok := loaded.Mailboxes["work"]
 	if !ok {
 		t.Fatal("expected work mailbox")
@@ -49,12 +53,12 @@ func TestSaveAndLoad(t *testing.T) {
 	}
 }
 
-func TestLoad_MalformedJSON(t *testing.T) {
+func TestLoad_MalformedTOML(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "config.json")
-	os.WriteFile(path, []byte("{bad json}"), 0600)
+	path := filepath.Join(dir, "config.toml")
+	os.WriteFile(path, []byte("{bad toml]]]"), 0600)
 	_, err := Load(path)
 	if err == nil {
-		t.Fatal("expected error for malformed JSON")
+		t.Fatal("expected error for malformed TOML")
 	}
 }

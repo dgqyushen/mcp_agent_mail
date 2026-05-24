@@ -1,12 +1,13 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"agent-mail/model"
+
+	"github.com/BurntSushi/toml"
 )
 
 func Load(path string) (*model.Config, error) {
@@ -21,7 +22,7 @@ func Load(path string) (*model.Config, error) {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
 	var cfg model.Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
+	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	if cfg.Mailboxes == nil {
@@ -35,12 +36,16 @@ func Save(path string, cfg *model.Config) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("mkdir config dir: %w", err)
 	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	f, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("marshal config: %w", err)
+		return fmt.Errorf("create config: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0600); err != nil {
-		return fmt.Errorf("write config: %w", err)
+	defer f.Close()
+	if err := toml.NewEncoder(f).Encode(cfg); err != nil {
+		return fmt.Errorf("encode config: %w", err)
+	}
+	if err := os.Chmod(path, 0600); err != nil {
+		return fmt.Errorf("chmod config: %w", err)
 	}
 	return nil
 }
