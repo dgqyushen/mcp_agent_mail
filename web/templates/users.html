@@ -8,7 +8,7 @@
 <table>
 <thead><tr><th>ID</th><th>用户名</th><th>Token</th><th>操作</th></tr></thead>
 <tbody>
-{{range .}}
+{{range .Users}}
 <tr>
 <td>{{.ID}}</td><td>{{.Name}}</td>
 <td><code>{{.TokenPrefix}}</code></td>
@@ -24,7 +24,7 @@
 </td>
 </tr>
 {{end}}
-{{if not .}}
+{{if not .Users}}
 <tr><td colspan="4" style="text-align:center;color:#999">暂无用户</td></tr>
 {{end}}
 </tbody>

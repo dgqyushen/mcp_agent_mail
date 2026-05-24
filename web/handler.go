@@ -31,6 +31,19 @@ func parsePage(file string) *pageSet {
 	}
 }
 
+type userWithToken struct {
+	ID          int
+	Name        string
+	CreatedAt   string
+	TokenPrefix string
+}
+
+type usersPageData struct {
+	Users    []userWithToken
+	NewToken string
+	Error    string
+}
+
 type AdminHandler struct {
 	userSvc *service.UserService
 	db      *sqlite.DB
@@ -87,14 +100,8 @@ func (h *AdminHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
-func (h *AdminHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
+func (h *AdminHandler) buildUsers() []userWithToken {
 	users, _ := h.userSvc.ListUsers()
-	type userWithToken struct {
-		ID          int
-		Name        string
-		CreatedAt   string
-		TokenPrefix string
-	}
 	var data []userWithToken
 	for _, u := range users {
 		data = append(data, userWithToken{
@@ -104,7 +111,11 @@ func (h *AdminHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
 			TokenPrefix: h.userSvc.GetActiveTokenPrefix(u.ID),
 		})
 	}
-	pages["users"].ExecuteTemplate(w, "base", data)
+	return data
+}
+
+func (h *AdminHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
+	pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers()})
 }
 
 func (h *AdminHandler) handleUserCreate(w http.ResponseWriter, r *http.Request) {
@@ -137,10 +148,10 @@ func (h *AdminHandler) handleTokenRefresh(w http.ResponseWriter, r *http.Request
 	}
 	token, err := h.userSvc.RefreshToken(userID)
 	if err != nil {
-		pages["users"].ExecuteTemplate(w, "base", map[string]string{"Error": err.Error()})
+		pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers(), Error: err.Error()})
 		return
 	}
-	pages["users"].ExecuteTemplate(w, "base", map[string]any{"NewToken": token})
+	pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers(), NewToken: token})
 }
 
 func (h *AdminHandler) handleUserDelete(w http.ResponseWriter, r *http.Request) {
