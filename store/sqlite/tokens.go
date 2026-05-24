@@ -72,3 +72,8 @@ func (db *DB) DeactivateTokens(userID int) error {
 	_, err := db.conn.Exec("UPDATE tokens SET is_active = 0 WHERE user_id = ? AND is_active = 1", userID)
 	return err
 }
+
+func (db *DB) DeleteTokensByUser(userID int) error {
+	_, err := db.conn.Exec("DELETE FROM tokens WHERE user_id = ?", userID)
+	return err
+}

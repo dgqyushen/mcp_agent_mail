@@ -68,7 +68,7 @@ func (s *MailboxService) Add(alias, name, providerType, baseURL, authData string
 }
 
 func (s *MailboxService) Remove(alias string) error {
-	if err := s.db.DeleteMailbox(alias); err != nil {
+	if err := s.db.DeleteMailbox(0, alias); err != nil {
 		return fmt.Errorf("remove mailbox: %w", err)
 	}
 	defAlias, err := s.db.GetSetting("default_mailbox")
@@ -77,7 +77,7 @@ func (s *MailboxService) Remove(alias string) error {
 		return nil
 	}
 	if defAlias == alias {
-		list, err := s.db.ListMailboxes()
+		list, err := s.db.ListMailboxes(0)
 		if err != nil {
 			slog.Warn("failed to list mailboxes for fallback", "error", err)
 			return nil
@@ -96,7 +96,7 @@ func (s *MailboxService) Remove(alias string) error {
 }
 
 func (s *MailboxService) Switch(alias string) error {
-	if _, err := s.db.GetMailbox(alias); err != nil {
+	if _, err := s.db.GetMailbox(0, alias); err != nil {
 		return fmt.Errorf("switch mailbox: %w", err)
 	}
 	return s.db.SetSetting("default_mailbox", alias)
@@ -108,7 +108,7 @@ func (s *MailboxService) Default() string {
 }
 
 func (s *MailboxService) List() ([]model.MailboxInfo, error) {
-	records, err := s.db.ListMailboxes()
+	records, err := s.db.ListMailboxes(0)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (s *MailboxService) Resolve(alias string) (*model.MailboxRecord, error) {
 	if alias == "" {
 		alias = s.Default()
 	}
-	return s.db.GetMailbox(alias)
+	return s.db.GetMailbox(0, alias)
 }
 
 func (s *MailboxService) Provider(alias string) (provider.EmailProvider, error) {
