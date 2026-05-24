@@ -11,17 +11,17 @@ func NewWebhookService(ms *MailboxService) *WebhookService {
 }
 
 func (s *WebhookService) Get(userID int, alias string) (*model.WebhookSettings, error) {
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return nil, err
 	}
-	return p.GetWebhook()
+	return r.GetWebhook()
 }
 
 func (s *WebhookService) Set(userID int, alias string, cfg *model.WebhookSettings) error {
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return err
 	}
-	return p.SetWebhook(cfg)
+	return r.SetWebhook(cfg)
 }

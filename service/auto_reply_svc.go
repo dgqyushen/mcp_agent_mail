@@ -11,17 +11,17 @@ func NewAutoReplyService(ms *MailboxService) *AutoReplyService {
 }
 
 func (s *AutoReplyService) Get(userID int, alias string) (*model.AutoReplyConfig, error) {
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return nil, err
 	}
-	return p.GetAutoReply()
+	return r.GetAutoReply()
 }
 
 func (s *AutoReplyService) Set(userID int, alias string, cfg *model.AutoReplyConfig) error {
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return err
 	}
-	return p.SetAutoReply(cfg)
+	return r.SetAutoReply(cfg)
 }

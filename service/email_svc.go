@@ -16,35 +16,35 @@ func NewEmailService(ms *MailboxService) *EmailService {
 }
 
 func (s *EmailService) List(userID int, alias string, limit, offset int) (*model.PaginatedResult, error) {
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return nil, err
 	}
-	return p.ListEmails(limit, offset)
+	return r.ListEmails(limit, offset)
 }
 
 func (s *EmailService) Get(userID int, alias string, id int) (*model.ParsedMail, error) {
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return nil, err
 	}
-	return p.GetEmail(id)
+	return r.GetEmail(id)
 }
 
 func (s *EmailService) Delete(userID int, alias string, id int) error {
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return err
 	}
-	return p.DeleteEmail(id)
+	return r.DeleteEmail(id)
 }
 
 func (s *EmailService) Clear(userID int, alias string) error {
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return err
 	}
-	return p.ClearInbox()
+	return r.ClearInbox()
 }
 
 func (s *EmailService) Search(userID int, alias, query string, limit int) (*model.PaginatedResult, error) {
@@ -55,11 +55,11 @@ func (s *EmailService) Search(userID int, alias, query string, limit int) (*mode
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
-	p, err := s.mailboxSvc.Provider(userID, alias)
+	r, err := s.mailboxSvc.Receiver(userID, alias)
 	if err != nil {
 		return nil, err
 	}
-	result, err := p.ListEmails(100, 0)
+	result, err := r.ListEmails(100, 0)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
