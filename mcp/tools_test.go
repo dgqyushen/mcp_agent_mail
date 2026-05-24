@@ -6,6 +6,9 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
+
+	"agent-mail/service"
+	"agent-mail/store/sqlite"
 )
 
 func TestStrArg(t *testing.T) {
@@ -88,5 +91,221 @@ func TestErrorResult(t *testing.T) {
 	}
 	if tc.Text == "" {
 		t.Fatal("error message should not be empty")
+	}
+}
+
+func setupHandler(t *testing.T) *Handler {
+	t.Helper()
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	ms := service.NewMailboxService(db, nil)
+	ms.Add("test", "Test", "cloudflare", "https://mail.example.com", `{"jwt":"tok","site_password":""}`)
+	return NewHandler(
+		ms,
+		service.NewEmailService(ms),
+		service.NewSendService(ms),
+		service.NewAutoReplyService(ms),
+		service.NewWebhookService(ms),
+		service.NewAttachmentService(ms),
+	)
+}
+
+func TestHandlerListMailboxes(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolListMailboxes,
+			Arguments: map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IsError {
+		t.Fatalf("unexpected error: %v", res.Content[0].(mcp.TextContent).Text)
+	}
+	var list []map[string]any
+	json.Unmarshal([]byte(res.Content[0].(mcp.TextContent).Text), &list)
+	if len(list) != 1 {
+		t.Fatalf("expected 1 mailbox, got %d", len(list))
+	}
+}
+
+func TestHandlerAddMailbox(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: ToolAddMailbox,
+			Arguments: map[string]any{
+				"alias":         "work",
+				"name":          "Work",
+				"provider_type": "cloudflare",
+				"base_url":      "https://work.example.com",
+				"auth_data":     `{"jwt":"worktok"}`,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IsError {
+		t.Fatalf("unexpected error: %v", res.Content[0].(mcp.TextContent).Text)
+	}
+}
+
+func TestHandlerRemoveMailbox(t *testing.T) {
+	h := setupHandler(t)
+	_, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolRemoveMailbox,
+			Arguments: map[string]any{"alias": "test"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHandlerRemoveMailboxMissingAlias(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolRemoveMailbox,
+			Arguments: map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatal("expected error for missing alias")
+	}
+}
+
+func TestHandlerSwitchMailbox(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolSwitchMailbox,
+			Arguments: map[string]any{"alias": "test"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.IsError {
+		t.Fatalf("unexpected error: %v", res.Content[0].(mcp.TextContent).Text)
+	}
+}
+
+func TestHandlerSwitchMailboxNotFound(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolSwitchMailbox,
+			Arguments: map[string]any{"alias": "nope"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatal("expected error for nonexistent mailbox")
+	}
+}
+
+func TestHandlerDeleteEmailMissingID(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolDeleteEmail,
+			Arguments: map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatal("expected error for missing id parameter")
+	}
+}
+
+func TestHandlerDeleteSentMissingID(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolDeleteSent,
+			Arguments: map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatal("expected error for missing id parameter")
+	}
+}
+
+func TestHandlerSendMailMissingRequired(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolSendMail,
+			Arguments: map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatal("expected error for missing required parameters")
+	}
+}
+
+func TestHandlerSetAutoReplyMissingEnabled(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolSetAutoReply,
+			Arguments: map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatal("expected error for missing enabled parameter")
+	}
+}
+
+func TestHandlerSetWebhookMissingRequired(t *testing.T) {
+	h := setupHandler(t)
+	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      ToolSetWebhook,
+			Arguments: map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.IsError {
+		t.Fatal("expected error for missing required parameters")
+	}
+}
+
+func TestHandlerUnknownTool(t *testing.T) {
+	h := setupHandler(t)
+	_, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      "nonexistent_tool",
+			Arguments: map[string]any{},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for unknown tool")
 	}
 }
