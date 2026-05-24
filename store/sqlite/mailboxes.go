@@ -66,6 +66,24 @@ func (db *DB) ListMailboxes(userID int) ([]model.MailboxRecord, error) {
 	return list, rows.Err()
 }
 
+func (db *DB) UpdateMailbox(m model.MailboxRecord) error {
+	result, err := db.conn.Exec(
+		`UPDATE mailboxes SET name=?, provider_type=?, base_url=?, auth_data=? WHERE user_id=? AND alias=?`,
+		m.Name, m.ProviderType, m.BaseURL, m.AuthData, m.UserID, m.Alias,
+	)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("mailbox %q not found", m.Alias)
+	}
+	return nil
+}
+
 func (db *DB) DeleteMailbox(userID int, alias string) error {
 	result, err := db.conn.Exec(
 		"DELETE FROM mailboxes WHERE user_id = ? AND alias = ?", userID, alias,

@@ -116,6 +116,52 @@ func TestMailboxUserIsolation(t *testing.T) {
 	}
 }
 
+func TestUpdateMailbox(t *testing.T) {
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	rec := model.MailboxRecord{
+		UserID:       1,
+		Alias:        "work",
+		Name:         "Work",
+		ProviderType: "cloudflare",
+		BaseURL:      "https://old.example.com",
+		AuthData:     `{"jwt":"old"}`,
+	}
+	if err := db.InsertMailbox(rec); err != nil {
+		t.Fatal(err)
+	}
+
+	updated := model.MailboxRecord{
+		UserID:       1,
+		Alias:        "work",
+		Name:         "Work Updated",
+		ProviderType: "gmail",
+		BaseURL:      "https://new.example.com",
+		AuthData:     `{"token":"new"}`,
+	}
+	if err := db.UpdateMailbox(updated); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := db.GetMailbox(1, "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Name != "Work Updated" {
+		t.Errorf("expected 'Work Updated', got %q", got.Name)
+	}
+	if got.ProviderType != "gmail" {
+		t.Errorf("expected gmail, got %q", got.ProviderType)
+	}
+	if got.BaseURL != "https://new.example.com" {
+		t.Errorf("expected new base URL, got %q", got.BaseURL)
+	}
+}
+
 func TestMailboxDuplicate(t *testing.T) {
 	db, err := sqlite.Open(":memory:")
 	if err != nil {

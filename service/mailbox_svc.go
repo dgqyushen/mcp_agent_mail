@@ -20,6 +20,21 @@ func NewMailboxService(db *sqlite.DB, factory provider.ProviderFactory) *Mailbox
 	return &MailboxService{db: db, factory: factory}
 }
 
+func (s *MailboxService) Update(userID int, alias, name, providerType, baseURL, authData string) error {
+	rec := model.MailboxRecord{
+		UserID:       userID,
+		Alias:        alias,
+		Name:         name,
+		ProviderType: providerType,
+		BaseURL:      baseURL,
+		AuthData:     authData,
+	}
+	if err := s.db.UpdateMailbox(rec); err != nil {
+		return fmt.Errorf("update mailbox: %w", err)
+	}
+	return nil
+}
+
 func (s *MailboxService) Add(userID int, alias, name, providerType, baseURL, authData string) error {
 	if providerType == "" {
 		providerType = "cloudflare"
