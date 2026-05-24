@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 
 	"agent-mail/client"
@@ -191,12 +193,119 @@ func (s *Server) handleValidateMailbox(ctx context.Context, req mcp.CallToolRequ
 	return mcp.NewToolResultText(toJSON(settings)), nil
 }
 
+func (s *Server) handleListEmails(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	limit := 20
+	if v := req.GetString("limit", ""); v != "" {
+		limit, _ = strconv.Atoi(v)
+	}
+	offset := 0
+	if v := req.GetString("offset", ""); v != "" {
+		offset, _ = strconv.Atoi(v)
+	}
+	result, err := c.ListParsedMails(limit, offset)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(result)), nil
+}
+
+func (s *Server) handleGetEmail(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	idStr, err := req.RequireString("mail_id")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: mail_id"), nil
+	}
+	id, _ := strconv.Atoi(idStr)
+	mail, err := c.GetParsedMail(id)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(mail)), nil
+}
+
+func (s *Server) handleDeleteEmail(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	idStr, err := req.RequireString("mail_id")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: mail_id"), nil
+	}
+	id, _ := strconv.Atoi(idStr)
+	if err := c.DeleteMail(id); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
+}
+
+func (s *Server) handleClearInbox(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	if err := c.ClearInbox(); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
+}
+
+func (s *Server) handleSearchEmails(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	query, err := req.RequireString("query")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: query"), nil
+	}
+	limit := 20
+	if v := req.GetString("limit", ""); v != "" {
+		limit, _ = strconv.Atoi(v)
+	}
+	result, err := c.ListParsedMails(100, 0)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	q := strings.ToLower(query)
+	var filtered []model.ParsedMail
+	for _, m := range result.Results {
+		if strings.Contains(strings.ToLower(m.Sender), q) || strings.Contains(strings.ToLower(m.Subject), q) {
+			filtered = append(filtered, m)
+		}
+	}
+	if len(filtered) > limit {
+		filtered = filtered[:limit]
+	}
+	return mcp.NewToolResultText(toJSON(map[string]interface{}{
+		"results": filtered,
+		"count":   len(filtered),
+	})), nil
+}
+
 func (s *Server) registerTools() {
 	s.mcpServer.AddTool(listMailboxesTool, s.handleListMailboxes)
 	s.mcpServer.AddTool(addMailboxTool, s.handleAddMailbox)
 	s.mcpServer.AddTool(removeMailboxTool, s.handleRemoveMailbox)
 	s.mcpServer.AddTool(switchMailboxTool, s.handleSwitchMailbox)
 	s.mcpServer.AddTool(validateMailboxTool, s.handleValidateMailbox)
+	s.mcpServer.AddTool(listEmailsTool, s.handleListEmails)
+	s.mcpServer.AddTool(getEmailTool, s.handleGetEmail)
+	s.mcpServer.AddTool(deleteEmailTool, s.handleDeleteEmail)
+	s.mcpServer.AddTool(clearInboxTool, s.handleClearInbox)
+	s.mcpServer.AddTool(searchEmailsTool, s.handleSearchEmails)
 }
 
 func toJSON(v interface{}) string {
@@ -230,4 +339,35 @@ var switchMailboxTool = mcp.NewTool("switch_mailbox",
 var validateMailboxTool = mcp.NewTool("validate_mailbox",
 	mcp.WithDescription("Check if a mailbox JWT is still valid"),
 	mcp.WithString("alias", mcp.Description("Mailbox alias to validate (leave empty for default)")),
+)
+
+var listEmailsTool = mcp.NewTool("list_emails",
+	mcp.WithDescription("List received emails with pagination"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+	mcp.WithString("limit", mcp.Description("Number of emails to fetch (1-100, default 20)")),
+	mcp.WithString("offset", mcp.Description("Offset for pagination (default 0)")),
+)
+
+var getEmailTool = mcp.NewTool("get_email",
+	mcp.WithDescription("Get a single email with full parsed content"),
+	mcp.WithString("mail_id", mcp.Required(), mcp.Description("Email ID to retrieve")),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+)
+
+var deleteEmailTool = mcp.NewTool("delete_email",
+	mcp.WithDescription("Delete a single email"),
+	mcp.WithString("mail_id", mcp.Required(), mcp.Description("Email ID to delete")),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+)
+
+var clearInboxTool = mcp.NewTool("clear_inbox",
+	mcp.WithDescription("Delete all received emails in the inbox"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+)
+
+var searchEmailsTool = mcp.NewTool("search_emails",
+	mcp.WithDescription("Search emails by sender or subject keyword (client-side search)"),
+	mcp.WithString("query", mcp.Required(), mcp.Description("Keyword to search in sender and subject")),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+	mcp.WithString("limit", mcp.Description("Maximum results (default 20)")),
 )
