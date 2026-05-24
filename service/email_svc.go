@@ -48,6 +48,13 @@ func (s *EmailService) Clear(alias string) error {
 }
 
 func (s *EmailService) Search(alias, query string, limit int) (*model.PaginatedResult, error) {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return &model.PaginatedResult{}, nil
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
 	p, err := s.mailboxSvc.Provider(alias)
 	if err != nil {
 		return nil, err
@@ -56,7 +63,7 @@ func (s *EmailService) Search(alias, query string, limit int) (*model.PaginatedR
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
-	q := strings.ToLower(strings.TrimSpace(query))
+	q = strings.ToLower(q)
 	var filtered []model.ParsedMail
 	for _, m := range result.Results {
 		if strings.Contains(strings.ToLower(m.Sender), q) ||

@@ -13,19 +13,22 @@ import (
 
 type testProviderFactory struct{}
 
-func (f *testProviderFactory) NewProvider(record model.MailboxRecord) provider.EmailProvider {
+func (f *testProviderFactory) NewProvider(record model.MailboxRecord) (provider.EmailProvider, error) {
 	auth := make(map[string]string)
 	json.Unmarshal([]byte(record.AuthData), &auth)
-	return cloudflare.New(record.BaseURL, auth["jwt"], auth["site_password"])
+	return cloudflare.New(record.BaseURL, auth["jwt"], auth["site_password"]), nil
 }
 
 func TestMailboxServiceAddList(t *testing.T) {
-	db, _ := sqlite.Open(":memory:")
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
 
 	svc := service.NewMailboxService(db, &testProviderFactory{})
 
-	err := svc.Add("work", "Work", "cloudflare", "https://mail.example.com", `{"jwt":"token123"}`)
+	err = svc.Add("work", "Work", "cloudflare", "https://mail.example.com", `{"jwt":"token123"}`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +46,10 @@ func TestMailboxServiceAddList(t *testing.T) {
 }
 
 func TestMailboxServiceSwitchDefault(t *testing.T) {
-	db, _ := sqlite.Open(":memory:")
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
 
 	svc := service.NewMailboxService(db, &testProviderFactory{})
@@ -64,7 +70,10 @@ func TestMailboxServiceSwitchDefault(t *testing.T) {
 }
 
 func TestMailboxServiceRemove(t *testing.T) {
-	db, _ := sqlite.Open(":memory:")
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
 
 	svc := service.NewMailboxService(db, &testProviderFactory{})
@@ -87,7 +96,10 @@ func TestMailboxServiceRemove(t *testing.T) {
 }
 
 func TestMailboxServiceResolve(t *testing.T) {
-	db, _ := sqlite.Open(":memory:")
+	db, err := sqlite.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
 
 	svc := service.NewMailboxService(db, &testProviderFactory{})
