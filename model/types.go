@@ -88,6 +88,7 @@ type SentEmailSummary struct {
 }
 
 type MailboxRecord struct {
+	UserID       int
 	Alias        string
 	Name         string
 	ProviderType string

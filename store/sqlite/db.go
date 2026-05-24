@@ -46,14 +46,31 @@ func (db *DB) migrate() error {
 			value TEXT NOT NULL
 		);
 
+		CREATE TABLE IF NOT EXISTS users (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			name       TEXT NOT NULL UNIQUE,
+			created_at TEXT NOT NULL DEFAULT (datetime('now'))
+		);
+
+		CREATE TABLE IF NOT EXISTS tokens (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id    INTEGER NOT NULL REFERENCES users(id),
+			token_hash TEXT NOT NULL UNIQUE,
+			prefix     TEXT NOT NULL,
+			created_at TEXT NOT NULL DEFAULT (datetime('now')),
+			is_active  INTEGER NOT NULL DEFAULT 1
+		);
+
 		CREATE TABLE IF NOT EXISTS mailboxes (
-			alias          TEXT PRIMARY KEY,
+			alias          TEXT NOT NULL,
+			user_id        INTEGER NOT NULL DEFAULT 0,
 			name           TEXT NOT NULL,
 			provider_type  TEXT NOT NULL DEFAULT 'cloudflare',
 			base_url       TEXT NOT NULL,
 			auth_data      TEXT NOT NULL DEFAULT '{}',
 			created_at     TEXT NOT NULL DEFAULT (datetime('now')),
-			updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+			updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+			PRIMARY KEY (user_id, alias)
 		);
 	`)
 	return err

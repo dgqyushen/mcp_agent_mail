@@ -11,9 +11,9 @@ import (
 
 func (db *DB) InsertMailbox(m model.MailboxRecord) error {
 	_, err := db.conn.Exec(
-		`INSERT INTO mailboxes (alias, name, provider_type, base_url, auth_data)
-		 VALUES (?, ?, ?, ?, ?)`,
-		m.Alias, m.Name, m.ProviderType, m.BaseURL, m.AuthData,
+		`INSERT INTO mailboxes (user_id, alias, name, provider_type, base_url, auth_data)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		m.UserID, m.Alias, m.Name, m.ProviderType, m.BaseURL, m.AuthData,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
@@ -24,12 +24,13 @@ func (db *DB) InsertMailbox(m model.MailboxRecord) error {
 	return nil
 }
 
-func (db *DB) GetMailbox(alias string) (*model.MailboxRecord, error) {
+func (db *DB) GetMailbox(userID int, alias string) (*model.MailboxRecord, error) {
 	var m model.MailboxRecord
 	err := db.conn.QueryRow(
-		`SELECT alias, name, provider_type, base_url, auth_data FROM mailboxes WHERE alias = ?`,
-		alias,
-	).Scan(&m.Alias, &m.Name, &m.ProviderType, &m.BaseURL, &m.AuthData)
+		`SELECT user_id, alias, name, provider_type, base_url, auth_data
+		 FROM mailboxes WHERE user_id = ? AND alias = ?`,
+		userID, alias,
+	).Scan(&m.UserID, &m.Alias, &m.Name, &m.ProviderType, &m.BaseURL, &m.AuthData)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("mailbox %q not found", alias)
@@ -42,9 +43,10 @@ func (db *DB) GetMailbox(alias string) (*model.MailboxRecord, error) {
 	return &m, nil
 }
 
-func (db *DB) ListMailboxes() ([]model.MailboxRecord, error) {
+func (db *DB) ListMailboxes(userID int) ([]model.MailboxRecord, error) {
 	rows, err := db.conn.Query(
-		`SELECT alias, name, provider_type, base_url, auth_data FROM mailboxes ORDER BY alias`,
+		`SELECT user_id, alias, name, provider_type, base_url, auth_data
+		 FROM mailboxes WHERE user_id = ? ORDER BY alias`, userID,
 	)
 	if err != nil {
 		return nil, err
@@ -53,7 +55,7 @@ func (db *DB) ListMailboxes() ([]model.MailboxRecord, error) {
 	var list []model.MailboxRecord
 	for rows.Next() {
 		var m model.MailboxRecord
-		if err := rows.Scan(&m.Alias, &m.Name, &m.ProviderType, &m.BaseURL, &m.AuthData); err != nil {
+		if err := rows.Scan(&m.UserID, &m.Alias, &m.Name, &m.ProviderType, &m.BaseURL, &m.AuthData); err != nil {
 			return nil, err
 		}
 		if m.ProviderType == "" {
@@ -64,8 +66,10 @@ func (db *DB) ListMailboxes() ([]model.MailboxRecord, error) {
 	return list, rows.Err()
 }
 
-func (db *DB) DeleteMailbox(alias string) error {
-	result, err := db.conn.Exec("DELETE FROM mailboxes WHERE alias = ?", alias)
+func (db *DB) DeleteMailbox(userID int, alias string) error {
+	result, err := db.conn.Exec(
+		"DELETE FROM mailboxes WHERE user_id = ? AND alias = ?", userID, alias,
+	)
 	if err != nil {
 		return err
 	}
