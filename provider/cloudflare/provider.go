@@ -10,6 +10,15 @@ import (
 
 func init() {
 	provider.RegisterProvider("cloudflare", NewProvider)
+	provider.RegisterProviderFormInfo(provider.ProviderFormInfo{
+		Type:  "cloudflare",
+		Label: "Cloudflare",
+		Fields: []provider.FieldDef{
+			{Key: "base_url", Label: "API Base URL", Type: "text", Section: "base_url", Required: true},
+			{Key: "jwt", Label: "JWT Token", Type: "password", Section: "auth_data", Required: true},
+			{Key: "site_password", Label: "Site Password", Type: "password", Section: "auth_data", Required: false},
+		},
+	})
 }
 
 func NewProvider(record model.MailboxRecord) (*provider.MailProvider, error) {

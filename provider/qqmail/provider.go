@@ -12,6 +12,14 @@ import (
 
 func init() {
 	provider.RegisterProvider("qqmail", NewProvider)
+	provider.RegisterProviderFormInfo(provider.ProviderFormInfo{
+		Type:  "qqmail",
+		Label: "QQMail",
+		Fields: []provider.FieldDef{
+			{Key: "username", Label: "邮箱地址", Type: "text", Section: "auth_data", Required: true},
+			{Key: "password", Label: "授权码", Type: "password", Section: "auth_data", Required: true},
+		},
+	})
 }
 
 type QQmailAuthData struct {

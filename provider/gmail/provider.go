@@ -16,6 +16,17 @@ import (
 
 func init() {
 	provider.RegisterProvider("gmail", NewProvider)
+	provider.RegisterProviderFormInfo(provider.ProviderFormInfo{
+		Type:  "gmail",
+		Label: "Gmail",
+		Fields: []provider.FieldDef{
+			{Key: "client_id", Label: "Client ID", Type: "text", Section: "auth_data", Required: true},
+			{Key: "client_secret", Label: "Client Secret", Type: "password", Section: "auth_data", Required: true},
+			{Key: "access_token", Label: "Access Token", Type: "text", Section: "auth_data", Required: true},
+			{Key: "refresh_token", Label: "Refresh Token", Type: "text", Section: "auth_data", Required: true},
+			{Key: "token_expiry", Label: "Token Expiry (RFC3339)", Type: "text", Section: "auth_data", Required: true},
+		},
+	})
 }
 
 type GmailAuthData struct {
