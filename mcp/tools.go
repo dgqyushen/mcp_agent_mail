@@ -304,18 +304,21 @@ func (s *Server) handleSendEmail(ctx context.Context, req mcp.CallToolRequest) (
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	toMail, err := req.RequireString("to_mail")
-	if err != nil {
-		return mcp.NewToolResultError("missing required parameter: to_mail"), nil
+	if err != nil || strings.TrimSpace(toMail) == "" {
+		return mcp.NewToolResultError("missing or empty required parameter: to_mail"), nil
 	}
 	subject, err := req.RequireString("subject")
-	if err != nil {
-		return mcp.NewToolResultError("missing required parameter: subject"), nil
+	if err != nil || strings.TrimSpace(subject) == "" {
+		return mcp.NewToolResultError("missing or empty required parameter: subject"), nil
 	}
 	content, err := req.RequireString("content")
-	if err != nil {
-		return mcp.NewToolResultError("missing required parameter: content"), nil
+	if err != nil || strings.TrimSpace(content) == "" {
+		return mcp.NewToolResultError("missing or empty required parameter: content"), nil
 	}
-	isHTML := req.GetString("is_html", "false") == "true"
+	isHTML, err := strconv.ParseBool(req.GetString("is_html", "false"))
+	if err != nil {
+		return mcp.NewToolResultError("invalid is_html: must be true or false"), nil
+	}
 
 	body := &model.SendMailBody{
 		ToMail:   toMail,
