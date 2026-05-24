@@ -13,6 +13,7 @@ import (
 	"agent-mail/mcp"
 	_ "agent-mail/provider/cloudflare"
 	_ "agent-mail/provider/gmail"
+	_ "agent-mail/provider/qqmail"
 	"agent-mail/service"
 	"agent-mail/store/sqlite"
 	"agent-mail/web"
