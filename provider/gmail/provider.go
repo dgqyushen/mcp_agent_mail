@@ -14,6 +14,10 @@ import (
 	"google.golang.org/api/option"
 )
 
+func init() {
+	provider.RegisterProvider("gmail", NewProvider)
+}
+
 type GmailAuthData struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`

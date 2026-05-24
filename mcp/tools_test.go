@@ -8,6 +8,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 
+	_ "agent-mail/provider/cloudflare"
 	"agent-mail/service"
 	"agent-mail/store/sqlite"
 )
