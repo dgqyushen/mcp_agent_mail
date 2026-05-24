@@ -1,0 +1,27 @@
+{{define "content"}}
+<h2 style="margin-bottom:1rem">我的邮箱</h2>
+{{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+{{if .Success}}<div class="alert alert-success">{{.Success}}</div>{{end}}
+<div style="margin-bottom:1rem">
+<a href="/user/mailboxes/add" class="btn btn-primary">添加邮箱</a>
+</div>
+<table>
+<thead><tr><th>别名</th><th>名称</th><th>类型</th><th>默认</th><th>状态</th><th>操作</th></tr></thead>
+<tbody>
+{{range .Mailboxes}}
+<tr>
+<td>{{.Alias}}</td>
+<td>{{.Name}}</td>
+<td>{{.ProviderType}}</td>
+<td>{{if .IsDefault}}✅{{else}}<a href="/user/mailboxes/switch?alias={{.Alias}}" class="btn" style="font-size:0.85rem;padding:0.25rem 0.5rem">设为默认</a>{{end}}</td>
+<td>{{if .Valid}}✅ 正常{{else}}❌ 异常{{end}}</td>
+<td>
+<a href="/user/mailboxes/edit?alias={{.Alias}}" class="btn" style="font-size:0.85rem;padding:0.25rem 0.5rem">编辑</a>
+<a href="/user/mailboxes/delete?alias={{.Alias}}" class="btn btn-danger" style="font-size:0.85rem;padding:0.25rem 0.5rem" onclick="return confirm('确认删除邮箱 {{.Alias}}？')">删除</a>
+</td>
+</tr>
+{{end}}</tbody>
+</table>
+{{if not .Mailboxes}}<p style="text-align:center;color:#999;margin-top:2rem">还没有添加邮箱</p>{{end}}
+<div style="margin-top:1rem"><a href="/user/logout">退出登录</a></div>
+{{end}}

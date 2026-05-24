@@ -23,7 +23,8 @@ var pages = map[string]*pageSet{
 	"login":      parsePage("login.html"),
 	"users":      parsePage("users.html"),
 	"usercreate": parsePage("user_create.html"),
-	"user_login": parsePage("user_login.html"),
+	"user_login":     parsePage("user_login.html"),
+	"user_mailboxes": parsePage("user_mailboxes.html"),
 }
 
 func parsePage(file string) *pageSet {
