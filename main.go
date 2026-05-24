@@ -70,6 +70,9 @@ func main() {
 	adminHandler := web.NewAdminHandler(db, userSvc)
 	srv.RegisterAdmin(adminHandler.Register)
 
+	userHandler := web.NewUserHandler(userSvc, mailboxSvc)
+	srv.RegisterAdmin(userHandler.Register)
+
 	slog.Info("agent-mail starting", "addr", *addr)
 	if err := srv.Start(); err != nil {
 		slog.Error("server failed", "error", err)
