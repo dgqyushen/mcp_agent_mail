@@ -52,7 +52,11 @@ var providerFormInfos = map[string]ProviderFormInfo{}
 
 // RegisterProviderFormInfo registers a provider's form configuration.
 func RegisterProviderFormInfo(info ProviderFormInfo) {
-	providerFormInfos[info.Type] = info
+	providerFormInfos[info.Type] = ProviderFormInfo{
+		Type:   info.Type,
+		Label:  info.Label,
+		Fields: copyFields(info.Fields),
+	}
 }
 
 // GetProviderFormInfos returns all registered provider form infos, sorted by Type.
