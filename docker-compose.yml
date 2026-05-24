@@ -1,9 +1,9 @@
 services:
   agent-mail:
     image: agent-mail:latest
-    command: --transport sse --addr :8080
+    command: --transport sse --addr :9090
     ports:
-      - "8080:8080"
+      - "9090:9090"
     volumes:
       - ~/.agent-mail:/root/.agent-mail:ro
     restart: unless-stopped
