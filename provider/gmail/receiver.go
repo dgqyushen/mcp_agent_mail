@@ -13,38 +13,6 @@ import (
 	"google.golang.org/api/gmail/v1"
 )
 
-type GmailSender struct {
-	srv  *gmail.Service
-	auth GmailAuthData
-}
-
-func (s *GmailSender) Validate() error {
-	if s.srv == nil {
-		return fmt.Errorf("gmail service not initialized")
-	}
-	return nil
-}
-
-func (s *GmailSender) SendMail(body *model.SendMailBody) error {
-	return provider.ErrCapNotSupported
-}
-
-func (s *GmailSender) CheckSendBalance() (int, error) {
-	return 0, provider.ErrCapNotSupported
-}
-
-func (s *GmailSender) ListSent(limit, offset int) (*model.SendboxResult, error) {
-	return nil, provider.ErrCapNotSupported
-}
-
-func (s *GmailSender) DeleteSent(id int) error {
-	return provider.ErrCapNotSupported
-}
-
-func (s *GmailSender) ClearSent() error {
-	return provider.ErrCapNotSupported
-}
-
 type GmailReceiver struct {
 	srv *gmail.Service
 }
