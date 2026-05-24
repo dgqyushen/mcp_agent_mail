@@ -1,0 +1,49 @@
+{{define "content"}}
+<h2 style="margin-bottom:1rem">{{if .IsEdit}}编辑邮箱{{else}}添加邮箱{{end}}</h2>
+{{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+{{if .Success}}<div class="alert alert-success">{{.Success}}</div>{{end}}
+<form method="POST">
+<div class="form-group">
+<label>别名 (唯一标识)</label>
+<input type="text" name="alias" value="{{.Alias}}" {{if .IsEdit}}readonly style="background:#eee"{{end}} required>
+</div>
+<div class="form-group">
+<label>显示名称</label>
+<input type="text" name="name" value="{{.Name}}" required>
+</div>
+<div class="form-group">
+<label>邮箱类型</label>
+<select name="provider_type" id="provider_type" onchange="this.form.submit()" {{if .IsEdit}}disabled{{end}}>
+<option value="">-- 请选择 --</option>
+{{range .Providers}}
+<option value="{{.Type}}" {{if eq $.ProviderType .Type}}selected{{end}}>{{.Label}}</option>
+{{end}}
+</select>
+</div>
+{{if .Fields}}
+<input type="hidden" name="provider_type_hidden" value="{{.ProviderType}}">
+<h3 style="margin:1rem 0 0.5rem">连接配置</h3>
+{{range .Fields}}
+{{if eq .Section "base_url"}}
+<div class="form-group">
+<label>{{.Label}}{{if .Required}} <span style="color:red">*</span>{{end}}</label>
+<input type="{{.Type}}" name="{{.Key}}" value="{{$.FieldValues .Key}}" {{if .Required}}required{{end}}>
+</div>
+{{end}}
+{{end}}
+<h3 style="margin:1rem 0 0.5rem">认证信息</h3>
+{{range .Fields}}
+{{if eq .Section "auth_data"}}
+<div class="form-group">
+<label>{{.Label}}{{if .Required}} <span style="color:red">*</span>{{end}}</label>
+<input type="{{.Type}}" name="{{.Key}}" value="{{$.FieldValues .Key}}" {{if .Required}}required{{end}}>
+</div>
+{{end}}
+{{end}}
+{{end}}
+<div style="margin-top:1rem">
+<button class="btn btn-primary">{{if .IsEdit}}保存修改{{else}}添加邮箱{{end}}</button>
+<a href="/user/mailboxes" class="btn" style="margin-left:0.5rem">取消</a>
+</div>
+</form>
+{{end}}
