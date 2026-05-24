@@ -40,6 +40,9 @@ func NewHandler(
 
 func (h *Handler) HandleToolCall(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	userID := GetUserID(ctx)
+	if userID == 0 {
+		return errorResult(fmt.Errorf("authentication required")), nil
+	}
 	switch req.Params.Name {
 	case ToolListMailboxes:
 		return h.listMailboxes(userID)

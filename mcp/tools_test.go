@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -94,6 +95,11 @@ func TestErrorResult(t *testing.T) {
 	}
 }
 
+func authContext(t *testing.T, userID int) context.Context {
+	t.Helper()
+	return context.WithValue(t.Context(), UserIDKey, userID)
+}
+
 func setupHandler(t *testing.T) *Handler {
 	t.Helper()
 	db, err := sqlite.Open(":memory:")
@@ -102,7 +108,7 @@ func setupHandler(t *testing.T) *Handler {
 	}
 	t.Cleanup(func() { db.Close() })
 	ms := service.NewMailboxService(db, nil)
-	ms.Add(0, "test", "Test", "cloudflare", "https://mail.example.com", `{"jwt":"tok","site_password":""}`)
+	ms.Add(1, "test", "Test", "cloudflare", "https://mail.example.com", `{"jwt":"tok","site_password":""}`)
 	return NewHandler(
 		ms,
 		service.NewEmailService(ms),
@@ -115,7 +121,7 @@ func setupHandler(t *testing.T) *Handler {
 
 func TestHandlerListMailboxes(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolListMailboxes,
 			Arguments: map[string]any{},
@@ -136,7 +142,7 @@ func TestHandlerListMailboxes(t *testing.T) {
 
 func TestHandlerAddMailbox(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name: ToolAddMailbox,
 			Arguments: map[string]any{
@@ -158,7 +164,7 @@ func TestHandlerAddMailbox(t *testing.T) {
 
 func TestHandlerRemoveMailbox(t *testing.T) {
 	h := setupHandler(t)
-	_, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	_, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolRemoveMailbox,
 			Arguments: map[string]any{"alias": "test"},
@@ -171,7 +177,7 @@ func TestHandlerRemoveMailbox(t *testing.T) {
 
 func TestHandlerRemoveMailboxMissingAlias(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolRemoveMailbox,
 			Arguments: map[string]any{},
@@ -187,7 +193,7 @@ func TestHandlerRemoveMailboxMissingAlias(t *testing.T) {
 
 func TestHandlerSwitchMailbox(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolSwitchMailbox,
 			Arguments: map[string]any{"alias": "test"},
@@ -203,7 +209,7 @@ func TestHandlerSwitchMailbox(t *testing.T) {
 
 func TestHandlerSwitchMailboxNotFound(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolSwitchMailbox,
 			Arguments: map[string]any{"alias": "nope"},
@@ -219,7 +225,7 @@ func TestHandlerSwitchMailboxNotFound(t *testing.T) {
 
 func TestHandlerDeleteEmailMissingID(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolDeleteEmail,
 			Arguments: map[string]any{},
@@ -235,7 +241,7 @@ func TestHandlerDeleteEmailMissingID(t *testing.T) {
 
 func TestHandlerDeleteSentMissingID(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolDeleteSent,
 			Arguments: map[string]any{},
@@ -251,7 +257,7 @@ func TestHandlerDeleteSentMissingID(t *testing.T) {
 
 func TestHandlerSendMailMissingRequired(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolSendMail,
 			Arguments: map[string]any{},
@@ -267,7 +273,7 @@ func TestHandlerSendMailMissingRequired(t *testing.T) {
 
 func TestHandlerSetAutoReplyMissingEnabled(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolSetAutoReply,
 			Arguments: map[string]any{},
@@ -283,7 +289,7 @@ func TestHandlerSetAutoReplyMissingEnabled(t *testing.T) {
 
 func TestHandlerSetWebhookMissingRequired(t *testing.T) {
 	h := setupHandler(t)
-	res, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	res, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      ToolSetWebhook,
 			Arguments: map[string]any{},
@@ -299,7 +305,7 @@ func TestHandlerSetWebhookMissingRequired(t *testing.T) {
 
 func TestHandlerUnknownTool(t *testing.T) {
 	h := setupHandler(t)
-	_, err := h.HandleToolCall(t.Context(), mcp.CallToolRequest{
+	_, err := h.HandleToolCall(authContext(t, 1), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{
 			Name:      "nonexistent_tool",
 			Arguments: map[string]any{},
