@@ -419,7 +419,10 @@ func (s *Server) handleSetAutoReply(ctx context.Context, req mcp.CallToolRequest
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	cfg := &model.AutoReplyConfig{}
+	cfg, err := c.GetAutoReply()
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	if v := req.GetString("subject", ""); v != "" {
 		cfg.Subject = v
 	}
@@ -461,11 +464,16 @@ func (s *Server) handleSetWebhook(ctx context.Context, req mcp.CallToolRequest) 
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	url, err := req.RequireString("url")
-	if err != nil || strings.TrimSpace(url) == "" {
+	rawURL, err := req.RequireString("url")
+	if err != nil || strings.TrimSpace(rawURL) == "" {
 		return mcp.NewToolResultError("missing or empty required parameter: url"), nil
 	}
-	cfg := &model.WebhookSettings{URL: url}
+	url := strings.TrimSpace(rawURL)
+	cfg, err := c.GetWebhook()
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	cfg.URL = url
 	if err := c.SetWebhook(cfg); err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
