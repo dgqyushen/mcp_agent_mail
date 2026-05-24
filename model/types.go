@@ -1,22 +1,5 @@
 package model
 
-import (
-	"os"
-	"path/filepath"
-)
-
-type MailboxConfig struct {
-	Name         string `json:"name" toml:"name"`
-	BaseURL      string `json:"base_url" toml:"base_url"`
-	JWT          string `json:"jwt" toml:"jwt"`
-	SitePassword string `json:"site_password" toml:"site_password"`
-}
-
-type Config struct {
-	DefaultMailbox string                   `json:"default_mailbox" toml:"default_mailbox"`
-	Mailboxes      map[string]MailboxConfig `json:"mailboxes" toml:"mailboxes"`
-}
-
 type SettingsResponse struct {
 	Address     string `json:"address"`
 	SendBalance int    `json:"send_balance"`
@@ -43,10 +26,11 @@ type Attachment struct {
 }
 
 type MailboxInfo struct {
-	Alias   string `json:"alias"`
-	Name    string `json:"name"`
-	BaseURL string `json:"base_url"`
-	Valid   bool   `json:"valid"`
+	Alias        string `json:"alias"`
+	Name         string `json:"name"`
+	ProviderType string `json:"provider_type"`
+	BaseURL      string `json:"base_url"`
+	Valid        bool   `json:"valid"`
 }
 
 type SendMailBody struct {
@@ -96,14 +80,6 @@ type AttachmentListResult struct {
 	Results []AttachmentItem `json:"results"`
 }
 
-type StatusResponse struct {
-	Status string `json:"status"`
-}
-
-type SuccessResponse struct {
-	Success bool `json:"success"`
-}
-
 type SentEmailSummary struct {
 	ID        int    `json:"id"`
 	To        string `json:"to"`
@@ -111,9 +87,10 @@ type SentEmailSummary struct {
 	CreatedAt string `json:"created_at"`
 }
 
-type ConfigPathFunc func() string
-
-var DefaultConfigPath = func() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".agent-mail", "config.toml")
+type MailboxRecord struct {
+	Alias        string
+	Name         string
+	ProviderType string
+	BaseURL      string
+	AuthData     string
 }
