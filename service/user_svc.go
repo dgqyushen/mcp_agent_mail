@@ -24,15 +24,13 @@ func (s *UserService) CreateUser(name string) (*sqlite.User, string, error) {
 	}
 	token, err := s.generateToken(u.ID)
 	if err != nil {
-		return nil, "", fmt.Errorf("create user but failed to generate token: %w", err)
+		s.db.DeleteUser(u.ID)
+		return nil, "", fmt.Errorf("create user failed: %w", err)
 	}
 	return u, token, nil
 }
 
 func (s *UserService) RefreshToken(userID int) (string, error) {
-	if err := s.db.DeactivateTokens(userID); err != nil {
-		return "", fmt.Errorf("deactivate old tokens: %w", err)
-	}
 	return s.generateToken(userID)
 }
 
