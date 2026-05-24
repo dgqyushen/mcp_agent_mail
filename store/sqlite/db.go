@@ -3,6 +3,8 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
@@ -12,16 +14,24 @@ type DB struct {
 }
 
 func Open(path string) (*DB, error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, fmt.Errorf("create db dir: %w", err)
+	}
 	conn, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 	conn.SetMaxOpenConns(1)
+	if err := os.Chmod(path, 0600); err != nil {
+		// file doesn't exist yet, SQLite will create it; chmod after first query
+	}
 	db := &DB{conn: conn}
 	if err := db.migrate(); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
+	os.Chmod(path, 0600)
 	return db, nil
 }
 

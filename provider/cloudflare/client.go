@@ -56,6 +56,10 @@ func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response,
 	slog.Debug("HTTP response", "method", method, "path", path, "status", resp.StatusCode, "duration", time.Since(start))
 	if resp.StatusCode == 429 {
 		resp.Body.Close()
+		if body != nil {
+			// Can't retry body requests safely without req.GetBody
+			return nil, fmt.Errorf("rate limited on %s %s", method, path)
+		}
 		slog.Warn("Rate limited, retrying after 3s", "method", method, "path", path)
 		time.Sleep(3 * time.Second)
 		resp, err = c.httpClient.Do(req)

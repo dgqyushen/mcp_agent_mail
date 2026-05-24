@@ -1,6 +1,8 @@
 package sqlite
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -29,7 +31,10 @@ func (db *DB) GetMailbox(alias string) (*model.MailboxRecord, error) {
 		alias,
 	).Scan(&m.Alias, &m.Name, &m.ProviderType, &m.BaseURL, &m.AuthData)
 	if err != nil {
-		return nil, fmt.Errorf("mailbox %q not found: %w", alias, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("mailbox %q not found", alias)
+		}
+		return nil, err
 	}
 	if m.ProviderType == "" {
 		m.ProviderType = "cloudflare"
@@ -64,7 +69,10 @@ func (db *DB) DeleteMailbox(alias string) error {
 	if err != nil {
 		return err
 	}
-	n, _ := result.RowsAffected()
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if n == 0 {
 		return fmt.Errorf("mailbox %q not found", alias)
 	}

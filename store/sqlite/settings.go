@@ -1,10 +1,18 @@
 package sqlite
 
+import (
+	"database/sql"
+	"errors"
+)
+
 func (db *DB) GetSetting(key string) (string, error) {
 	var value string
 	err := db.conn.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&value)
 	if err != nil {
-		return "", nil
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
 	}
 	return value, nil
 }
