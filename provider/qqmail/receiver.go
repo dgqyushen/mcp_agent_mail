@@ -257,37 +257,6 @@ func bufferToParsedMail(msg *imapclient.FetchMessageBuffer) model.ParsedMail {
 	}
 }
 
-type QQmailSender struct {
-	auth QQmailAuthData
-}
-
-func (s *QQmailSender) Validate() error {
-	if s.auth.Username == "" || s.auth.Password == "" {
-		return fmt.Errorf("qqmail sender: auth credentials required")
-	}
-	return nil
-}
-
-func (s *QQmailSender) SendMail(body *model.SendMailBody) error {
-	return provider.ErrCapNotSupported
-}
-
-func (s *QQmailSender) CheckSendBalance() (int, error) {
-	return 0, provider.ErrCapNotSupported
-}
-
-func (s *QQmailSender) ListSent(limit, offset int) (*model.SendboxResult, error) {
-	return nil, provider.ErrCapNotSupported
-}
-
-func (s *QQmailSender) DeleteSent(id int) error {
-	return provider.ErrCapNotSupported
-}
-
-func (s *QQmailSender) ClearSent() error {
-	return provider.ErrCapNotSupported
-}
-
 func parseMIMEMessage(raw []byte) (text, html string, atts []model.Attachment, err error) {
 	mr, err := mail.CreateReader(bytes.NewReader(raw))
 	if err != nil {
