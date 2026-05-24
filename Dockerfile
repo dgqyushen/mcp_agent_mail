@@ -1,10 +1,12 @@
-FROM golang:alpine AS builder
-WORKDIR /build
+FROM golang:1.24-alpine AS builder
+WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o agent-mail .
 
 FROM scratch
-COPY --from=builder /build/agent-mail /agent-mail
-ENTRYPOINT ["/agent-mail"]
+COPY --from=builder /app/agent-mail /agent-mail
+EXPOSE 8080
+VOLUME ["/data"]
+ENTRYPOINT ["/agent-mail", "--db-path", "/data/agent-mail.db"]

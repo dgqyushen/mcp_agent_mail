@@ -2,54 +2,78 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log/slog"
 	"os"
+	"strings"
 
-	"agent-mail/config"
-	mcp "agent-mail/mcp"
-	"agent-mail/model"
-
-	"github.com/mark3labs/mcp-go/server"
+	"agent-mail/mcp"
+	"agent-mail/service"
+	"agent-mail/store/sqlite"
 )
 
 func main() {
-	cfgPath := flag.String("config", "", "path to config file (default: ~/.agent-mail/config.toml)")
-	transport := flag.String("transport", "stdio", "transport mode: stdio, sse, streamable-http")
-	addr := flag.String("addr", ":8080", "listen address for HTTP based transport")
+	addr := flag.String("addr", ":8080", "listen address for HTTP MCP server")
+	dbPath := flag.String("db-path", "", "path to SQLite database file (default: $HOME/.agent-mail/data.db)")
+	envFile := flag.String("env-file", "", "path to .env file")
 	flag.Parse()
 
-	path := *cfgPath
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, nil)))
+
+	path := *dbPath
 	if path == "" {
-		path = model.DefaultConfigPath()
+		home, _ := os.UserHomeDir()
+		path = home + "/.agent-mail/data.db"
 	}
 
-	cfg, err := config.Load(path)
+	if *envFile != "" {
+		loadEnvFile(*envFile)
+	}
+
+	db, err := sqlite.Open(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		slog.Error("failed to open database", "error", err)
 		os.Exit(1)
 	}
+	defer db.Close()
+	slog.Info("database opened", "path", path)
 
-	s := mcp.New(cfg, path)
+	mailboxSvc := service.NewMailboxService(db, nil)
+	emailSvc := service.NewEmailService(mailboxSvc)
+	sendSvc := service.NewSendService(mailboxSvc)
+	autoReplySvc := service.NewAutoReplyService(mailboxSvc)
+	webhookSvc := service.NewWebhookService(mailboxSvc)
+	attachmentSvc := service.NewAttachmentService(mailboxSvc)
 
-	switch *transport {
-	case "sse":
-		sseServer := server.NewSSEServer(s.MCPServer())
-		fmt.Fprintf(os.Stderr, "Starting SSE MCP server on %s\n", *addr)
-		if err := sseServer.Start(*addr); err != nil {
-			fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
-			os.Exit(1)
+	handler := mcp.NewHandler(mailboxSvc, emailSvc, sendSvc, autoReplySvc, webhookSvc, attachmentSvc)
+	srv := mcp.NewServer(*addr, handler)
+
+	slog.Info("agent-mail starting", "addr", *addr)
+	if err := srv.Start(); err != nil {
+		slog.Error("server failed", "error", err)
+		os.Exit(1)
+	}
+}
+
+func loadEnvFile(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		slog.Warn("failed to read env file", "path", path, "error", err)
+		return
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
 		}
-	case "streamable-http":
-		httpServer := server.NewStreamableHTTPServer(s.MCPServer())
-		fmt.Fprintf(os.Stderr, "Starting Streamable HTTP MCP server on %s\n", *addr)
-		if err := httpServer.Start(*addr); err != nil {
-			fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
-			os.Exit(1)
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
 		}
-	default:
-		if err := s.ServeStdio(); err != nil {
-			fmt.Fprintf(os.Stderr, "Server error: %v\n", err)
-			os.Exit(1)
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		if os.Getenv(key) == "" {
+			os.Setenv(key, val)
 		}
 	}
 }
