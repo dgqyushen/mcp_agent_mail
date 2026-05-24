@@ -45,6 +45,7 @@ func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response,
 		return nil, fmt.Errorf("request %s %s: %w", method, path, err)
 	}
 	if resp.StatusCode == 429 {
+		resp.Body.Close()
 		time.Sleep(3 * time.Second)
 		resp, err = c.httpClient.Do(req)
 		if err != nil {
