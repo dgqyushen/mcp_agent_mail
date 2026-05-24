@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"sort"
 
 	"agent-mail/model"
 )
@@ -41,24 +42,44 @@ type ProviderFormInfo struct {
 	Fields []FieldDef `json:"fields"`
 }
 
+func copyFields(fields []FieldDef) []FieldDef {
+	out := make([]FieldDef, len(fields))
+	copy(out, fields)
+	return out
+}
+
 var providerFormInfos = map[string]ProviderFormInfo{}
 
+// RegisterProviderFormInfo registers a provider's form configuration.
 func RegisterProviderFormInfo(info ProviderFormInfo) {
 	providerFormInfos[info.Type] = info
 }
 
+// GetProviderFormInfos returns all registered provider form infos, sorted by Type.
 func GetProviderFormInfos() []ProviderFormInfo {
 	infos := make([]ProviderFormInfo, 0, len(providerFormInfos))
 	for _, info := range providerFormInfos {
-		infos = append(infos, info)
+		infos = append(infos, ProviderFormInfo{
+			Type:   info.Type,
+			Label:  info.Label,
+			Fields: copyFields(info.Fields),
+		})
 	}
+	sort.Slice(infos, func(i, j int) bool {
+		return infos[i].Type < infos[j].Type
+	})
 	return infos
 }
 
+// GetProviderFormInfo returns the form info for a specific provider type.
 func GetProviderFormInfo(providerType string) *ProviderFormInfo {
 	info, ok := providerFormInfos[providerType]
 	if !ok {
 		return nil
 	}
-	return &info
+	return &ProviderFormInfo{
+		Type:   info.Type,
+		Label:  info.Label,
+		Fields: copyFields(info.Fields),
+	}
 }
