@@ -297,6 +297,106 @@ func (s *Server) handleSearchEmails(ctx context.Context, req mcp.CallToolRequest
 	})), nil
 }
 
+func (s *Server) handleSendEmail(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	toMail, err := req.RequireString("to_mail")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: to_mail"), nil
+	}
+	subject, err := req.RequireString("subject")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: subject"), nil
+	}
+	content, err := req.RequireString("content")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: content"), nil
+	}
+	isHTML := req.GetString("is_html", "false") == "true"
+
+	body := &model.SendMailBody{
+		ToMail:   toMail,
+		ToName:   req.GetString("to_name", ""),
+		FromName: req.GetString("from_name", ""),
+		Subject:  subject,
+		Content:  content,
+		IsHTML:   isHTML,
+	}
+	if err := c.SendMail(body); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
+}
+
+func (s *Server) handleCheckSendBalance(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	settings, err := c.GetSettings()
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(map[string]int{"send_balance": settings.SendBalance})), nil
+}
+
+func (s *Server) handleListSent(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	limit, err := parseIntParam(req.GetString("limit", ""), "20", 1, 100)
+	if err != nil {
+		return mcp.NewToolResultError("invalid limit: " + err.Error()), nil
+	}
+	offset, err := parseIntParam(req.GetString("offset", ""), "0", 0, 10000)
+	if err != nil {
+		return mcp.NewToolResultError("invalid offset: " + err.Error()), nil
+	}
+	result, err := c.ListSendbox(limit, offset)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(result)), nil
+}
+
+func (s *Server) handleDeleteSent(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	idStr, err := req.RequireString("send_id")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: send_id"), nil
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		return mcp.NewToolResultError("send_id must be a positive integer"), nil
+	}
+	if err := c.DeleteSendbox(id); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
+}
+
+func (s *Server) handleClearSent(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	alias := req.GetString("mailbox", "")
+	c, err := s.getClientForMailbox(alias)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	if err := c.ClearSentItems(); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
+}
+
 func (s *Server) registerTools() {
 	s.mcpServer.AddTool(listMailboxesTool, s.handleListMailboxes)
 	s.mcpServer.AddTool(addMailboxTool, s.handleAddMailbox)
@@ -308,6 +408,11 @@ func (s *Server) registerTools() {
 	s.mcpServer.AddTool(deleteEmailTool, s.handleDeleteEmail)
 	s.mcpServer.AddTool(clearInboxTool, s.handleClearInbox)
 	s.mcpServer.AddTool(searchEmailsTool, s.handleSearchEmails)
+	s.mcpServer.AddTool(sendEmailTool, s.handleSendEmail)
+	s.mcpServer.AddTool(checkSendBalanceTool, s.handleCheckSendBalance)
+	s.mcpServer.AddTool(listSentTool, s.handleListSent)
+	s.mcpServer.AddTool(deleteSentTool, s.handleDeleteSent)
+	s.mcpServer.AddTool(clearSentTool, s.handleClearSent)
 }
 
 func toJSON(v interface{}) string {
@@ -398,4 +503,38 @@ var searchEmailsTool = mcp.NewTool("search_emails",
 	mcp.WithString("query", mcp.Required(), mcp.Description("Keyword to search in sender and subject")),
 	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
 	mcp.WithString("limit", mcp.Description("Maximum results (default 20)")),
+)
+
+var sendEmailTool = mcp.NewTool("send_email",
+	mcp.WithDescription("Send an email from the current mailbox"),
+	mcp.WithString("to_mail", mcp.Required(), mcp.Description("Recipient email address")),
+	mcp.WithString("subject", mcp.Required(), mcp.Description("Email subject")),
+	mcp.WithString("content", mcp.Required(), mcp.Description("Email body content")),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+	mcp.WithString("from_name", mcp.Description("Display name for the sender")),
+	mcp.WithString("to_name", mcp.Description("Display name for the recipient")),
+	mcp.WithString("is_html", mcp.Description("Whether content is HTML (true/false, default false)")),
+)
+
+var checkSendBalanceTool = mcp.NewTool("check_send_balance",
+	mcp.WithDescription("Check remaining send balance for the mailbox"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+)
+
+var listSentTool = mcp.NewTool("list_sent",
+	mcp.WithDescription("List sent emails with pagination"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+	mcp.WithString("limit", mcp.Description("Number of items (1-100, default 20)")),
+	mcp.WithString("offset", mcp.Description("Offset for pagination (default 0)")),
+)
+
+var deleteSentTool = mcp.NewTool("delete_sent",
+	mcp.WithDescription("Delete a sent email record"),
+	mcp.WithString("send_id", mcp.Required(), mcp.Description("ID of the sent email to delete")),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
+)
+
+var clearSentTool = mcp.NewTool("clear_sent",
+	mcp.WithDescription("Delete all sent email records"),
+	mcp.WithString("mailbox", mcp.Description("Mailbox alias (default if empty)")),
 )
