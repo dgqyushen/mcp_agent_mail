@@ -199,13 +199,13 @@ func (s *Server) handleListEmails(ctx context.Context, req mcp.CallToolRequest) 
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	limit := 20
-	if v := req.GetString("limit", ""); v != "" {
-		limit, _ = strconv.Atoi(v)
+	limit, err := parseIntParam(req.GetString("limit", ""), "20", 1, 100)
+	if err != nil {
+		return mcp.NewToolResultError("invalid limit: " + err.Error()), nil
 	}
-	offset := 0
-	if v := req.GetString("offset", ""); v != "" {
-		offset, _ = strconv.Atoi(v)
+	offset, err := parseIntParam(req.GetString("offset", ""), "0", 0, 10000)
+	if err != nil {
+		return mcp.NewToolResultError("invalid offset: " + err.Error()), nil
 	}
 	result, err := c.ListParsedMails(limit, offset)
 	if err != nil {
@@ -215,16 +215,15 @@ func (s *Server) handleListEmails(ctx context.Context, req mcp.CallToolRequest) 
 }
 
 func (s *Server) handleGetEmail(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	id, err := parseMailID(req)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	alias := req.GetString("mailbox", "")
 	c, err := s.getClientForMailbox(alias)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	idStr, err := req.RequireString("mail_id")
-	if err != nil {
-		return mcp.NewToolResultError("missing required parameter: mail_id"), nil
-	}
-	id, _ := strconv.Atoi(idStr)
 	mail, err := c.GetParsedMail(id)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -233,16 +232,15 @@ func (s *Server) handleGetEmail(ctx context.Context, req mcp.CallToolRequest) (*
 }
 
 func (s *Server) handleDeleteEmail(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	id, err := parseMailID(req)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
 	alias := req.GetString("mailbox", "")
 	c, err := s.getClientForMailbox(alias)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	idStr, err := req.RequireString("mail_id")
-	if err != nil {
-		return mcp.NewToolResultError("missing required parameter: mail_id"), nil
-	}
-	id, _ := strconv.Atoi(idStr)
 	if err := c.DeleteMail(id); err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -271,16 +269,20 @@ func (s *Server) handleSearchEmails(ctx context.Context, req mcp.CallToolRequest
 	if err != nil {
 		return mcp.NewToolResultError("missing required parameter: query"), nil
 	}
-	limit := 20
-	if v := req.GetString("limit", ""); v != "" {
-		limit, _ = strconv.Atoi(v)
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return mcp.NewToolResultError("query must not be empty"), nil
+	}
+	limit, err := parseIntParam(req.GetString("limit", ""), "20", 1, 100)
+	if err != nil {
+		return mcp.NewToolResultError("invalid limit: " + err.Error()), nil
 	}
 	result, err := c.ListParsedMails(100, 0)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	q := strings.ToLower(query)
-	var filtered []model.ParsedMail
+	filtered := make([]model.ParsedMail, 0)
 	for _, m := range result.Results {
 		if strings.Contains(strings.ToLower(m.Sender), q) || strings.Contains(strings.ToLower(m.Subject), q) {
 			filtered = append(filtered, m)
@@ -311,6 +313,32 @@ func (s *Server) registerTools() {
 func toJSON(v interface{}) string {
 	data, _ := json.Marshal(v)
 	return string(data)
+}
+
+func parseMailID(req mcp.CallToolRequest) (int, error) {
+	idStr, err := req.RequireString("mail_id")
+	if err != nil {
+		return 0, fmt.Errorf("missing required parameter: mail_id")
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		return 0, fmt.Errorf("mail_id must be a positive integer")
+	}
+	return id, nil
+}
+
+func parseIntParam(raw, defaultVal string, min, max int) (int, error) {
+	if raw == "" {
+		raw = defaultVal
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("must be an integer")
+	}
+	if v < min || v > max {
+		return 0, fmt.Errorf("must be between %d and %d", min, max)
+	}
+	return v, nil
 }
 
 var listMailboxesTool = mcp.NewTool("list_mailboxes",
