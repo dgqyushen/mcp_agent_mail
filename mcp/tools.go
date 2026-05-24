@@ -5,19 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"sync"
 
 	"agent-mail/client"
 	"agent-mail/config"
 	"agent-mail/model"
 
-	"github.com/mark3labs/mcp-go/server"
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 type Server struct {
 	mcpServer *server.MCPServer
 	cfg       *model.Config
 	cfgPath   string
+	mu        sync.Mutex
 }
 
 func New(cfg *model.Config, cfgPath string) *Server {
@@ -31,6 +33,8 @@ func New(cfg *model.Config, cfgPath string) *Server {
 }
 
 func (s *Server) getClientForMailbox(alias string) (*client.Client, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if alias == "" {
 		alias = s.cfg.DefaultMailbox
 	}
@@ -50,6 +54,9 @@ func (s *Server) ServeStdio() error {
 }
 
 func (s *Server) handleListMailboxes(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	var infos []model.MailboxInfo
 	for alias, mb := range s.cfg.Mailboxes {
 		c := client.New(mb.BaseURL, mb.JWT, mb.SitePassword)
@@ -66,53 +73,103 @@ func (s *Server) handleListMailboxes(ctx context.Context, req mcp.CallToolReques
 }
 
 func (s *Server) handleAddMailbox(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	alias, _ := req.RequireString("alias")
-	name, _ := req.RequireString("name")
-	baseURL, _ := req.RequireString("base_url")
-	jwt, _ := req.RequireString("jwt")
+	alias, err := req.RequireString("alias")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: alias"), nil
+	}
+	name, err := req.RequireString("name")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: name"), nil
+	}
+	baseURL, err := req.RequireString("base_url")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: base_url"), nil
+	}
+	jwt, err := req.RequireString("jwt")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: jwt"), nil
+	}
 	sitePass := req.GetString("site_password", "")
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.cfg.Mailboxes[alias]; exists {
+		return mcp.NewToolResultError(fmt.Sprintf("mailbox %q already exists, use remove_mailbox first or choose a different alias", alias)), nil
+	}
+
+	if s.cfg.DefaultMailbox == "" {
+		s.cfg.DefaultMailbox = alias
+	}
 	s.cfg.Mailboxes[alias] = model.MailboxConfig{
 		Name:         name,
 		BaseURL:      baseURL,
 		JWT:          jwt,
 		SitePassword: sitePass,
 	}
-	if s.cfg.DefaultMailbox == "" {
-		s.cfg.DefaultMailbox = alias
-	}
 	if err := s.saveConfig(); err != nil {
+		delete(s.cfg.Mailboxes, alias)
+		if s.cfg.DefaultMailbox == alias {
+			s.cfg.DefaultMailbox = ""
+		}
 		return mcp.NewToolResultError("save config: " + err.Error()), nil
 	}
 	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
 }
 
 func (s *Server) handleRemoveMailbox(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	alias, _ := req.RequireString("alias")
+	alias, err := req.RequireString("alias")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: alias"), nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if _, ok := s.cfg.Mailboxes[alias]; !ok {
 		return mcp.NewToolResultError(fmt.Sprintf("mailbox %q not found", alias)), nil
 	}
+
+	prevDefault := s.cfg.DefaultMailbox
+	mbCopy := s.cfg.Mailboxes[alias]
+
 	delete(s.cfg.Mailboxes, alias)
 	if s.cfg.DefaultMailbox == alias {
 		s.cfg.DefaultMailbox = ""
+		keys := make([]string, 0, len(s.cfg.Mailboxes))
 		for k := range s.cfg.Mailboxes {
-			s.cfg.DefaultMailbox = k
-			break
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		if len(keys) > 0 {
+			s.cfg.DefaultMailbox = keys[0]
 		}
 	}
 	if err := s.saveConfig(); err != nil {
+		s.cfg.Mailboxes[alias] = mbCopy
+		s.cfg.DefaultMailbox = prevDefault
 		return mcp.NewToolResultError("save config: " + err.Error()), nil
 	}
 	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
 }
 
 func (s *Server) handleSwitchMailbox(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	alias, _ := req.RequireString("alias")
+	alias, err := req.RequireString("alias")
+	if err != nil {
+		return mcp.NewToolResultError("missing required parameter: alias"), nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if _, ok := s.cfg.Mailboxes[alias]; !ok {
 		return mcp.NewToolResultError(fmt.Sprintf("mailbox %q not found", alias)), nil
 	}
+
+	prevDefault := s.cfg.DefaultMailbox
 	s.cfg.DefaultMailbox = alias
 	if err := s.saveConfig(); err != nil {
+		s.cfg.DefaultMailbox = prevDefault
 		return mcp.NewToolResultError("save config: " + err.Error()), nil
 	}
 	return mcp.NewToolResultText(toJSON(map[string]string{"status": "ok"})), nil
@@ -126,7 +183,10 @@ func (s *Server) handleValidateMailbox(ctx context.Context, req mcp.CallToolRequ
 	}
 	settings, err := c.GetSettings()
 	if err != nil {
-		return mcp.NewToolResultError("JWT invalid or expired: " + err.Error()), nil
+		return mcp.NewToolResultText(toJSON(map[string]interface{}{
+			"valid": false,
+			"error": err.Error(),
+		})), nil
 	}
 	return mcp.NewToolResultText(toJSON(settings)), nil
 }
