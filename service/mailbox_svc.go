@@ -1,42 +1,21 @@
 package service
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"agent-mail/model"
 	"agent-mail/provider"
-	"agent-mail/provider/cloudflare"
 	"agent-mail/store/sqlite"
 )
 
-type ProviderFactory interface {
-	NewProvider(record model.MailboxRecord) (provider.EmailProvider, error)
-}
-
-type DefaultProviderFactory struct{}
-
-func (f *DefaultProviderFactory) NewProvider(record model.MailboxRecord) (provider.EmailProvider, error) {
-	auth := make(map[string]string)
-	if err := json.Unmarshal([]byte(record.AuthData), &auth); err != nil {
-		return nil, fmt.Errorf("invalid auth data for %q: %w", record.Alias, err)
-	}
-	switch record.ProviderType {
-	case "cloudflare":
-		return cloudflare.New(record.BaseURL, auth["jwt"], auth["site_password"]), nil
-	default:
-		return nil, fmt.Errorf("unsupported provider type: %q", record.ProviderType)
-	}
-}
-
 type MailboxService struct {
 	db      *sqlite.DB
-	factory ProviderFactory
+	factory provider.ProviderFactory
 }
 
-func NewMailboxService(db *sqlite.DB, factory ProviderFactory) *MailboxService {
+func NewMailboxService(db *sqlite.DB, factory provider.ProviderFactory) *MailboxService {
 	if factory == nil {
-		factory = &DefaultProviderFactory{}
+		factory = &provider.DefaultProviderFactory{}
 	}
 	return &MailboxService{db: db, factory: factory}
 }
@@ -104,7 +83,12 @@ func (s *MailboxService) List(userID int) ([]model.MailboxInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		valid := p.Validate() == nil
+		valid := false
+		if p.Receiver != nil {
+			valid = p.Receiver.Validate() == nil
+		} else if p.Sender != nil {
+			valid = p.Sender.Validate() == nil
+		}
 		infos[i] = model.MailboxInfo{
 			Alias:        r.Alias,
 			Name:         r.Name,
@@ -117,15 +101,11 @@ func (s *MailboxService) List(userID int) ([]model.MailboxInfo, error) {
 }
 
 func (s *MailboxService) Validate(userID int, alias string) (*model.SettingsResponse, error) {
-	rec, err := s.Resolve(userID, alias)
+	r, err := s.Receiver(userID, alias)
 	if err != nil {
 		return nil, err
 	}
-	p, err := s.factory.NewProvider(*rec)
-	if err != nil {
-		return nil, err
-	}
-	return p.GetSettings()
+	return r.GetSettings()
 }
 
 func (s *MailboxService) Resolve(userID int, alias string) (*model.MailboxRecord, error) {
@@ -135,10 +115,32 @@ func (s *MailboxService) Resolve(userID int, alias string) (*model.MailboxRecord
 	return s.db.GetMailbox(userID, alias)
 }
 
-func (s *MailboxService) Provider(userID int, alias string) (provider.EmailProvider, error) {
+func (s *MailboxService) Provider(userID int, alias string) (*provider.MailProvider, error) {
 	rec, err := s.Resolve(userID, alias)
 	if err != nil {
 		return nil, err
 	}
 	return s.factory.NewProvider(*rec)
+}
+
+func (s *MailboxService) Receiver(userID int, alias string) (provider.MailReceiver, error) {
+	p, err := s.Provider(userID, alias)
+	if err != nil {
+		return nil, err
+	}
+	if p.Receiver == nil {
+		return nil, provider.ErrCapNotSupported
+	}
+	return p.Receiver, nil
+}
+
+func (s *MailboxService) Sender(userID int, alias string) (provider.MailSender, error) {
+	p, err := s.Provider(userID, alias)
+	if err != nil {
+		return nil, err
+	}
+	if p.Sender == nil {
+		return nil, provider.ErrCapNotSupported
+	}
+	return p.Sender, nil
 }
