@@ -48,6 +48,8 @@ func (h *UserHandler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/user/mailboxes", h.authWrap(h.handleMailboxes))
 	mux.HandleFunc("/user/mailboxes/add", h.authWrap(h.handleMailboxAdd))
 	mux.HandleFunc("/user/mailboxes/edit", h.authWrap(h.handleMailboxEdit))
+	mux.HandleFunc("/user/mailboxes/delete", h.authWrap(h.handleMailboxDelete))
+	mux.HandleFunc("/user/mailboxes/switch", h.authWrap(h.handleMailboxSwitch))
 }
 
 func (h *UserHandler) authWrap(fn http.HandlerFunc) http.HandlerFunc {
@@ -66,12 +68,12 @@ func (h *UserHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	token := r.FormValue("token")
-	_, err := h.userSvc.ValidateToken(token)
+	userID, err := h.userSvc.ValidateToken(token)
 	if err != nil {
 		pages["user_login"].ExecuteTemplate(w, "base", map[string]string{"Error": "Token 无效或已过期"})
 		return
 	}
-	setUserSession(w)
+	setUserSession(w, userID)
 	http.Redirect(w, r, "/user/mailboxes", http.StatusSeeOther)
 }
 
@@ -233,8 +235,26 @@ func (h *UserHandler) handleMailboxEdit(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, "/user/mailboxes", http.StatusSeeOther)
 }
 
-// getUserID extracts the user ID from a valid user session.
-// Must only be called inside authWrap'd handlers.
-func getUserID(r *http.Request) int {
-	return 0 // placeholder — will be replaced in Task 8 where user ID is stored in session
+func (h *UserHandler) handleMailboxDelete(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	alias := r.FormValue("alias")
+	if err := h.mailboxSvc.Remove(userID, alias); err != nil {
+		if r.Method == "POST" {
+			http.Redirect(w, r, "/user/mailboxes?error="+err.Error(), http.StatusSeeOther)
+			return
+		}
+		pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Error: err.Error()})
+		return
+	}
+	http.Redirect(w, r, "/user/mailboxes", http.StatusSeeOther)
+}
+
+func (h *UserHandler) handleMailboxSwitch(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	alias := r.FormValue("alias")
+	if err := h.mailboxSvc.Switch(userID, alias); err != nil {
+		pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Error: err.Error()})
+		return
+	}
+	http.Redirect(w, r, "/user/mailboxes", http.StatusSeeOther)
 }

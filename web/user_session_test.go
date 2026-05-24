@@ -8,7 +8,7 @@ import (
 
 func TestSetAndCheckUserSession(t *testing.T) {
 	w := httptest.NewRecorder()
-	sid := setUserSession(w)
+	sid := setUserSession(w, 0)
 	if sid == "" {
 		t.Fatal("expected non-empty session ID")
 	}

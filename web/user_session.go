@@ -8,12 +8,17 @@ import (
 	"time"
 )
 
-type userSessionStore struct {
-	mu     sync.Mutex
-	tokens map[string]time.Time
+type userSessionData struct {
+	userID int
+	expiry time.Time
 }
 
-var userSessions = &userSessionStore{tokens: make(map[string]time.Time)}
+type userSessionStore struct {
+	mu     sync.Mutex
+	tokens map[string]userSessionData
+}
+
+var userSessions = &userSessionStore{tokens: make(map[string]userSessionData)}
 
 func newUserSession() string {
 	b := make([]byte, 16)
@@ -24,10 +29,10 @@ func newUserSession() string {
 const userSessionCookie = "user_session"
 const userSessionTTL = 12 * time.Hour
 
-func setUserSession(w http.ResponseWriter) string {
+func setUserSession(w http.ResponseWriter, userID int) string {
 	sid := newUserSession()
 	userSessions.mu.Lock()
-	userSessions.tokens[sid] = time.Now().Add(userSessionTTL)
+	userSessions.tokens[sid] = userSessionData{userID: userID, expiry: time.Now().Add(userSessionTTL)}
 	userSessions.mu.Unlock()
 	http.SetCookie(w, &http.Cookie{
 		Name:     userSessionCookie,
@@ -47,12 +52,27 @@ func checkUserSession(r *http.Request) bool {
 	}
 	userSessions.mu.Lock()
 	defer userSessions.mu.Unlock()
-	exp, ok := userSessions.tokens[c.Value]
-	if !ok || time.Now().After(exp) {
+	data, ok := userSessions.tokens[c.Value]
+	if !ok || time.Now().After(data.expiry) {
 		delete(userSessions.tokens, c.Value)
 		return false
 	}
 	return true
+}
+
+func getUserID(r *http.Request) int {
+	c, err := r.Cookie(userSessionCookie)
+	if err != nil {
+		return 0
+	}
+	userSessions.mu.Lock()
+	defer userSessions.mu.Unlock()
+	data, ok := userSessions.tokens[c.Value]
+	if !ok || time.Now().After(data.expiry) {
+		delete(userSessions.tokens, c.Value)
+		return 0
+	}
+	return data.userID
 }
 
 func clearUserSession(w http.ResponseWriter) {
