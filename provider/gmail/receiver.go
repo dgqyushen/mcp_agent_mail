@@ -30,11 +30,11 @@ func (s *GmailSender) SendMail(body *model.SendMailBody) error {
 }
 
 func (s *GmailSender) CheckSendBalance() (int, error) {
-	return 0, nil
+	return 0, provider.ErrCapNotSupported
 }
 
 func (s *GmailSender) ListSent(limit, offset int) (*model.SendboxResult, error) {
-	return &model.SendboxResult{}, nil
+	return nil, provider.ErrCapNotSupported
 }
 
 func (s *GmailSender) DeleteSent(id int) error {
@@ -46,8 +46,7 @@ func (s *GmailSender) ClearSent() error {
 }
 
 type GmailReceiver struct {
-	srv  *gmail.Service
-	auth GmailAuthData
+	srv *gmail.Service
 }
 
 func (r *GmailReceiver) GetSettings() (*model.SettingsResponse, error) {
@@ -62,6 +61,12 @@ func (r *GmailReceiver) GetSettings() (*model.SettingsResponse, error) {
 }
 
 func (r *GmailReceiver) ListEmails(limit, offset int) (*model.PaginatedResult, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
 	var allIDs []string
 	var total int
 	pageToken := ""
