@@ -50,42 +50,18 @@ func (s *GmailSender) ListSent(limit, offset int) (*model.SendboxResult, error) 
 		offset = 0
 	}
 
-	var allIDs []string
-	var total int
-	pageToken := ""
-	firstPage := true
-
-	for len(allIDs) < offset+limit {
+	ids, total, err := collectMessageIDs(func(nextToken string) (*gmail.ListMessagesResponse, error) {
 		call := s.srv.Users.Messages.List("me").MaxResults(500).Q("in:sent")
-		if pageToken != "" {
-			call.PageToken(pageToken)
+		if nextToken != "" {
+			call.PageToken(nextToken)
 		}
-		resp, err := call.Do()
-		if err != nil {
-			return nil, fmt.Errorf("list sent messages: %w", err)
-		}
-		if firstPage {
-			total = int(resp.ResultSizeEstimate)
-			firstPage = false
-		}
-		for _, m := range resp.Messages {
-			allIDs = append(allIDs, m.Id)
-		}
-		if resp.NextPageToken == "" {
-			break
-		}
-		pageToken = resp.NextPageToken
+		return call.Do()
+	}, offset+limit)
+	if err != nil {
+		return nil, fmt.Errorf("list sent messages: %w", err)
 	}
 
-	start := offset
-	if start > len(allIDs) {
-		start = len(allIDs)
-	}
-	end := start + limit
-	if end > len(allIDs) {
-		end = len(allIDs)
-	}
-	window := allIDs[start:end]
+	window := sliceWindow(ids, offset, limit)
 
 	var results []model.SendboxItem
 	for _, id := range window {
