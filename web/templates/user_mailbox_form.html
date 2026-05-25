@@ -3,6 +3,7 @@
 {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
 {{if .Success}}<div class="alert alert-success">{{.Success}}</div>{{end}}
 <form method="POST">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <div class="form-group">
 <label>别名 (唯一标识)</label>
 <input type="text" name="alias" value="{{.Alias}}" {{if .IsEdit}}readonly style="background:#eee"{{end}} required>
@@ -27,7 +28,7 @@
 {{if eq .Section "base_url"}}
 <div class="form-group">
 <label>{{.Label}}{{if .Required}} <span style="color:red">*</span>{{end}}</label>
-<input type="{{.Type}}" name="{{.Key}}" value="{{$.FieldValues .Key}}" {{if .Required}}required{{end}}>
+<input type="{{.Type}}" name="{{.Key}}" value="{{$.FieldValue .Key}}" {{if .Required}}required{{end}}>
 </div>
 {{end}}
 {{end}}
@@ -36,7 +37,7 @@
 {{if eq .Section "auth_data"}}
 <div class="form-group">
 <label>{{.Label}}{{if .Required}} <span style="color:red">*</span>{{end}}</label>
-<input type="{{.Type}}" name="{{.Key}}" value="{{$.FieldValues .Key}}" {{if .Required}}required{{end}}>
+<input type="{{.Type}}" name="{{.Key}}" value="{{$.FieldValue .Key}}" {{if .Required}}required{{end}}>
 </div>
 {{end}}
 {{end}}

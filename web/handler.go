@@ -42,9 +42,23 @@ type userWithToken struct {
 }
 
 type usersPageData struct {
-	Users    []userWithToken
-	NewToken string
-	Error    string
+	Users     []userWithToken
+	NewToken  string
+	Error     string
+	CSRFToken string
+}
+
+type loginData struct {
+	CSRFToken string
+	Error     string
+}
+
+type userCreateData struct {
+	CSRFToken string
+	Error     string
+	Success   bool
+	Name      string
+	Token     string
 }
 
 type AdminHandler struct {
@@ -57,7 +71,9 @@ func NewAdminHandler(db *sqlite.DB, userSvc *service.UserService) *AdminHandler 
 }
 
 func (h *AdminHandler) Register(mux *http.ServeMux) {
-	mux.HandleFunc("/admin/login", h.handleLogin)
+	mux.HandleFunc("/admin/login", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
+	})
 	mux.HandleFunc("/admin/users", h.authWrap(h.handleUsers))
 	mux.HandleFunc("/admin/users/create", h.authWrap(h.handleUserCreate))
 	mux.HandleFunc("/admin/users/refresh", h.authWrap(h.handleTokenRefresh))
@@ -69,7 +85,7 @@ func (h *AdminHandler) Register(mux *http.ServeMux) {
 func (h *AdminHandler) authWrap(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !checkSession(r) {
-			http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+			http.Redirect(w, r, "/admin/", http.StatusSeeOther)
 			return
 		}
 		fn(w, r)
@@ -84,19 +100,25 @@ func (h *AdminHandler) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if checkSession(r) {
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 	} else {
-		http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+		h.handleLogin(w, r)
 	}
 }
 
 func (h *AdminHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		pages["login"].ExecuteTemplate(w, "base", nil)
+		csrf := setCSRFToken(w)
+		pages["login"].ExecuteTemplate(w, "base", loginData{CSRFToken: csrf})
+		return
+	}
+	if !validateCSRFToken(r) {
+		http.Error(w, "invalid CSRF token", http.StatusForbidden)
 		return
 	}
 	password := r.FormValue("password")
 	storedHash, _ := h.db.GetSetting("admin_password_hash")
 	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password)); err != nil {
-		pages["login"].ExecuteTemplate(w, "base", map[string]string{"Error": "密码错误"})
+		csrf := setCSRFToken(w)
+		pages["login"].ExecuteTemplate(w, "base", loginData{CSRFToken: csrf, Error: "密码错误"})
 		return
 	}
 	setSession(w)
@@ -118,30 +140,42 @@ func (h *AdminHandler) buildUsers() []userWithToken {
 }
 
 func (h *AdminHandler) handleUsers(w http.ResponseWriter, r *http.Request) {
-	pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers()})
+	csrf := setCSRFToken(w)
+	pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers(), CSRFToken: csrf})
 }
 
 func (h *AdminHandler) handleUserCreate(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		pages["usercreate"].ExecuteTemplate(w, "base", nil)
+		csrf := setCSRFToken(w)
+		pages["usercreate"].ExecuteTemplate(w, "base", userCreateData{CSRFToken: csrf})
+		return
+	}
+	if !validateCSRFToken(r) {
+		http.Error(w, "invalid CSRF token", http.StatusForbidden)
 		return
 	}
 	name := r.FormValue("name")
 	u, token, err := h.userSvc.CreateUser(name)
 	if err != nil {
-		pages["usercreate"].ExecuteTemplate(w, "base", map[string]string{"Error": err.Error()})
+		csrf := setCSRFToken(w)
+		pages["usercreate"].ExecuteTemplate(w, "base", userCreateData{CSRFToken: csrf, Error: err.Error()})
 		return
 	}
-	pages["usercreate"].ExecuteTemplate(w, "base", map[string]any{
-		"Success": true,
-		"Name":    u.Name,
-		"Token":   token,
+	pages["usercreate"].ExecuteTemplate(w, "base", userCreateData{
+		CSRFToken: setCSRFToken(w),
+		Success:   true,
+		Name:      u.Name,
+		Token:     token,
 	})
 }
 
 func (h *AdminHandler) handleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.NotFound(w, r)
+		return
+	}
+	if !validateCSRFToken(r) {
+		http.Error(w, "invalid CSRF token", http.StatusForbidden)
 		return
 	}
 	userID, _ := strconv.Atoi(r.FormValue("user_id"))
@@ -151,15 +185,21 @@ func (h *AdminHandler) handleTokenRefresh(w http.ResponseWriter, r *http.Request
 	}
 	token, err := h.userSvc.RefreshToken(userID)
 	if err != nil {
-		pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers(), Error: err.Error()})
+		csrf := setCSRFToken(w)
+		pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers(), Error: err.Error(), CSRFToken: csrf})
 		return
 	}
-	pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers(), NewToken: token})
+	csrf := setCSRFToken(w)
+	pages["users"].ExecuteTemplate(w, "base", usersPageData{Users: h.buildUsers(), NewToken: token, CSRFToken: csrf})
 }
 
 func (h *AdminHandler) handleUserDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.NotFound(w, r)
+		return
+	}
+	if !validateCSRFToken(r) {
+		http.Error(w, "invalid CSRF token", http.StatusForbidden)
 		return
 	}
 	userID, _ := strconv.Atoi(r.FormValue("user_id"))
@@ -172,5 +212,5 @@ func (h *AdminHandler) handleUserDelete(w http.ResponseWriter, r *http.Request) 
 
 func (h *AdminHandler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	clearSession(w)
-	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/", http.StatusSeeOther)
 }

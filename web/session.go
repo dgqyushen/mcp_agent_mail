@@ -3,6 +3,7 @@ package web
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -17,7 +18,9 @@ var sessions = &sessionStore{tokens: make(map[string]time.Time)}
 
 func newSession() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		slog.Error("rand.Read failed generating session", "error", err)
+	}
 	return hex.EncodeToString(b)
 }
 
@@ -62,4 +65,25 @@ func clearSession(w http.ResponseWriter) {
 		Path:   "/admin",
 		MaxAge: -1,
 	})
+}
+
+func (s *sessionStore) startCleanup(interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			s.mu.Lock()
+			now := time.Now()
+			for id, exp := range s.tokens {
+				if now.After(exp) {
+					delete(s.tokens, id)
+				}
+			}
+			s.mu.Unlock()
+		}
+	}()
+}
+
+func StartSessionCleanup(interval time.Duration) {
+	sessions.startCleanup(interval)
 }

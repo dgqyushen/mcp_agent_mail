@@ -19,18 +19,32 @@ type mailboxesPageData struct {
 	Mailboxes []mailboxWithDefault
 	Error     string
 	Success   string
+	CSRFToken string
 }
 
 type mailboxFormPageData struct {
 	Providers    []provider.ProviderFormInfo
 	Fields       []provider.FieldDef
-	FieldValues  func(key string) string
+	fieldValues  func(key string) string
 	ProviderType string
 	Alias        string
 	Name         string
 	IsEdit       bool
 	Error        string
 	Success      string
+	CSRFToken    string
+}
+
+type userLoginData struct {
+	CSRFToken string
+	Error     string
+}
+
+func (d mailboxFormPageData) FieldValue(key string) string {
+	if d.fieldValues != nil {
+		return d.fieldValues(key)
+	}
+	return ""
 }
 
 type UserHandler struct {
@@ -64,13 +78,19 @@ func (h *UserHandler) authWrap(fn http.HandlerFunc) http.HandlerFunc {
 
 func (h *UserHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		pages["user_login"].ExecuteTemplate(w, "base", nil)
+		csrf := setCSRFToken(w)
+		pages["user_login"].ExecuteTemplate(w, "base", userLoginData{CSRFToken: csrf})
+		return
+	}
+	if !validateCSRFToken(r) {
+		http.Error(w, "invalid CSRF token", http.StatusForbidden)
 		return
 	}
 	token := r.FormValue("token")
 	userID, err := h.userSvc.ValidateToken(token)
 	if err != nil {
-		pages["user_login"].ExecuteTemplate(w, "base", map[string]string{"Error": "Token 无效或已过期"})
+		csrf := setCSRFToken(w)
+		pages["user_login"].ExecuteTemplate(w, "base", userLoginData{CSRFToken: csrf, Error: "Token 无效或已过期"})
 		return
 	}
 	setUserSession(w, userID)
@@ -86,7 +106,8 @@ func (h *UserHandler) handleMailboxes(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	infos, err := h.mailboxSvc.List(userID)
 	if err != nil {
-		pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Error: err.Error()})
+		csrf := setCSRFToken(w)
+		pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Error: err.Error(), CSRFToken: csrf})
 		return
 	}
 	def := h.mailboxSvc.Default(userID)
@@ -97,7 +118,8 @@ func (h *UserHandler) handleMailboxes(w http.ResponseWriter, r *http.Request) {
 			IsDefault:   info.Alias == def,
 		})
 	}
-	pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Mailboxes: mails})
+	csrf := setCSRFToken(w)
+	pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Mailboxes: mails, CSRFToken: csrf})
 }
 
 func (h *UserHandler) buildFormFields(providerType string, authDataJSON string) []provider.FieldDef {
@@ -139,12 +161,18 @@ func (h *UserHandler) handleMailboxAdd(w http.ResponseWriter, r *http.Request) {
 			Providers:    infos,
 			ProviderType: providerType,
 			IsEdit:       false,
-			FieldValues:  func(key string) string { return "" },
+			fieldValues:  func(key string) string { return "" },
+			CSRFToken:    setCSRFToken(w),
 		}
 		if providerType != "" {
 			data.Fields = h.buildFormFields(providerType, "")
 		}
 		pages["user_mailbox_form"].ExecuteTemplate(w, "base", data)
+		return
+	}
+
+	if !validateCSRFToken(r) {
+		http.Error(w, "invalid CSRF token", http.StatusForbidden)
 		return
 	}
 
@@ -156,14 +184,15 @@ func (h *UserHandler) handleMailboxAdd(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	baseURL, authData, err := h.parseFormFieldsToJSON(r, providerType)
 	if err != nil {
-		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{Error: err.Error()})
+		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{Error: err.Error(), CSRFToken: setCSRFToken(w)})
 		return
 	}
 
 	if err := h.mailboxSvc.Add(userID, alias, name, providerType, baseURL, authData); err != nil {
 		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{
-			Error: err.Error(),
-			Alias: alias, Name: name, ProviderType: providerType,
+			Error:     err.Error(),
+			Alias:     alias, Name: name, ProviderType: providerType,
+			CSRFToken: setCSRFToken(w),
 		})
 		return
 	}
@@ -180,7 +209,7 @@ func (h *UserHandler) handleMailboxEdit(w http.ResponseWriter, r *http.Request) 
 
 	rec, err := h.mailboxSvc.Resolve(userID, alias)
 	if err != nil {
-		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{Error: err.Error()})
+		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{Error: err.Error(), CSRFToken: setCSRFToken(w)})
 		return
 	}
 
@@ -211,9 +240,15 @@ func (h *UserHandler) handleMailboxEdit(w http.ResponseWriter, r *http.Request) 
 			Alias:        rec.Alias,
 			Name:         rec.Name,
 			IsEdit:       true,
-			FieldValues:  fieldValues,
+			fieldValues:  fieldValues,
+			CSRFToken:    setCSRFToken(w),
 		}
 		pages["user_mailbox_form"].ExecuteTemplate(w, "base", data)
+		return
+	}
+
+	if !validateCSRFToken(r) {
+		http.Error(w, "invalid CSRF token", http.StatusForbidden)
 		return
 	}
 
@@ -224,18 +259,24 @@ func (h *UserHandler) handleMailboxEdit(w http.ResponseWriter, r *http.Request) 
 	name := r.FormValue("name")
 	baseURL, authData, err := h.parseFormFieldsToJSON(r, providerType)
 	if err != nil {
-		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{Error: err.Error()})
+		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{Error: err.Error(), CSRFToken: setCSRFToken(w)})
 		return
 	}
 
 	if err := h.mailboxSvc.Update(userID, alias, name, providerType, baseURL, authData); err != nil {
-		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{Error: err.Error()})
+		pages["user_mailbox_form"].ExecuteTemplate(w, "base", mailboxFormPageData{Error: err.Error(), CSRFToken: setCSRFToken(w)})
 		return
 	}
 	http.Redirect(w, r, "/user/mailboxes", http.StatusSeeOther)
 }
 
 func (h *UserHandler) handleMailboxDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		if !validateCSRFToken(r) {
+			http.Error(w, "invalid CSRF token", http.StatusForbidden)
+			return
+		}
+	}
 	userID := getUserID(r)
 	alias := r.FormValue("alias")
 	if err := h.mailboxSvc.Remove(userID, alias); err != nil {
@@ -243,17 +284,23 @@ func (h *UserHandler) handleMailboxDelete(w http.ResponseWriter, r *http.Request
 			http.Redirect(w, r, "/user/mailboxes?error="+err.Error(), http.StatusSeeOther)
 			return
 		}
-		pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Error: err.Error()})
+		pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Error: err.Error(), CSRFToken: setCSRFToken(w)})
 		return
 	}
 	http.Redirect(w, r, "/user/mailboxes", http.StatusSeeOther)
 }
 
 func (h *UserHandler) handleMailboxSwitch(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		if !validateCSRFToken(r) {
+			http.Error(w, "invalid CSRF token", http.StatusForbidden)
+			return
+		}
+	}
 	userID := getUserID(r)
 	alias := r.FormValue("alias")
 	if err := h.mailboxSvc.Switch(userID, alias); err != nil {
-		pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Error: err.Error()})
+		pages["user_mailboxes"].ExecuteTemplate(w, "base", mailboxesPageData{Error: err.Error(), CSRFToken: setCSRFToken(w)})
 		return
 	}
 	http.Redirect(w, r, "/user/mailboxes", http.StatusSeeOther)

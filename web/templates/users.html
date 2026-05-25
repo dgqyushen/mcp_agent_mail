@@ -14,10 +14,12 @@
 <td><code>{{.TokenPrefix}}</code></td>
 <td>
 <form method="POST" action="/admin/users/refresh" style="display:inline">
+<input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
 <input type="hidden" name="user_id" value="{{.ID}}">
 <button class="btn btn-success" style="padding:.25rem .5rem;font-size:.85rem">刷新</button>
 </form>
 <form method="POST" action="/admin/users/delete" style="display:inline" onsubmit="return confirm('确认删除用户 {{.Name}}？')">
+<input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
 <input type="hidden" name="user_id" value="{{.ID}}">
 <button class="btn btn-danger" style="padding:.25rem .5rem;font-size:.85rem">删除</button>
 </form>

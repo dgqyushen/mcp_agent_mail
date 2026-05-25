@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestSetAndCheckUserSession(t *testing.T) {
@@ -34,5 +35,27 @@ func TestSetAndCheckUserSession(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: userSessionCookie, Value: sid})
 	if !checkUserSession(req) {
 		t.Error("expected valid session")
+	}
+}
+
+func TestUserSessionCleanup(t *testing.T) {
+	store := &userSessionStore{tokens: make(map[string]userSessionData)}
+
+	store.mu.Lock()
+	store.tokens["expired"] = userSessionData{userID: 1, expiry: time.Now().Add(-1 * time.Hour)}
+	store.tokens["valid"] = userSessionData{userID: 2, expiry: time.Now().Add(1 * time.Hour)}
+	store.mu.Unlock()
+
+	store.startCleanup(50 * time.Millisecond)
+
+	time.Sleep(150 * time.Millisecond)
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if _, ok := store.tokens["expired"]; ok {
+		t.Error("expired user session should have been cleaned up")
+	}
+	if _, ok := store.tokens["valid"]; !ok {
+		t.Error("valid user session should not have been cleaned up")
 	}
 }

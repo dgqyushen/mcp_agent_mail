@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestSetAndCheckSession(t *testing.T) {
@@ -67,4 +68,26 @@ func TestSessionConcurrent(t *testing.T) {
 		}()
 	}
 	wg2.Wait()
+}
+
+func TestSessionCleanup(t *testing.T) {
+	store := &sessionStore{tokens: make(map[string]time.Time)}
+
+	store.mu.Lock()
+	store.tokens["expired"] = time.Now().Add(-1 * time.Hour)
+	store.tokens["valid"] = time.Now().Add(1 * time.Hour)
+	store.mu.Unlock()
+
+	store.startCleanup(50 * time.Millisecond)
+
+	time.Sleep(150 * time.Millisecond)
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if _, ok := store.tokens["expired"]; ok {
+		t.Error("expired session should have been cleaned up")
+	}
+	if _, ok := store.tokens["valid"]; !ok {
+		t.Error("valid session should not have been cleaned up")
+	}
 }

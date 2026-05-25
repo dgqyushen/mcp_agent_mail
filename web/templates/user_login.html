@@ -3,6 +3,7 @@
 <h2 style="margin-bottom:1rem">用户登录</h2>
 {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
 <form method="POST">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <input type="text" name="token" placeholder="输入您的 Token (atm-xxx...)" required style="font-family:monospace">
 <button class="btn btn-primary" style="width:100%">登录</button>
 </form>

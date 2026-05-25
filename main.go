@@ -17,6 +17,7 @@ import (
 	"agent-mail/service"
 	"agent-mail/store/sqlite"
 	"agent-mail/web"
+	"time"
 )
 
 func main() {
@@ -56,6 +57,9 @@ func main() {
 
 	initAdminPassword(db)
 
+	web.StartSessionCleanup(10 * time.Minute)
+	web.StartUserSessionCleanup(10 * time.Minute)
+
 	mailboxSvc := service.NewMailboxService(db, nil)
 	emailSvc := service.NewEmailService(mailboxSvc)
 	sendSvc := service.NewSendService(mailboxSvc)
@@ -92,7 +96,10 @@ func initAdminPassword(db *sqlite.DB) {
 	password := os.Getenv("ADMIN_PASSWORD")
 	if password == "" {
 		b := make([]byte, 16)
-		rand.Read(b)
+		if _, err := rand.Read(b); err != nil {
+			slog.Error("rand.Read failed generating admin password", "error", err)
+			os.Exit(1)
+		}
 		password = hex.EncodeToString(b)
 		slog.Warn("ADMIN_PASSWORD not set, generated random password", "password", password)
 	}
