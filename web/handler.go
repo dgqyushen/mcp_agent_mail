@@ -115,7 +115,11 @@ func (h *AdminHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	password := r.FormValue("password")
-	storedHash, _ := h.db.GetSetting("admin_password_hash")
+	storedHash, getErr := h.db.GetSetting("admin_password_hash")
+	if getErr != nil || storedHash == "" {
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
 	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password)); err != nil {
 		csrf := setCSRFToken(w)
 		pages["login"].ExecuteTemplate(w, "base", loginData{CSRFToken: csrf, Error: "密码错误"})
@@ -126,7 +130,10 @@ func (h *AdminHandler) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) buildUsers() []userWithToken {
-	users, _ := h.userSvc.ListUsers()
+	users, err := h.userSvc.ListUsers()
+	if err != nil {
+		return nil
+	}
 	var data []userWithToken
 	for _, u := range users {
 		data = append(data, userWithToken{

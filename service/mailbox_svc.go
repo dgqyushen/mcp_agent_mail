@@ -55,9 +55,14 @@ func (s *MailboxService) Add(userID int, alias, name, providerType, baseURL, aut
 		return fmt.Errorf("add mailbox: %w", err)
 	}
 	dk := fmt.Sprintf("default_mailbox_%d", userID)
-	defAlias, _ := s.db.GetSetting(dk)
+	defAlias, err := s.db.GetSetting(dk)
+	if err != nil {
+		return fmt.Errorf("get default setting: %w", err)
+	}
 	if defAlias == "" {
-		s.db.SetSetting(dk, alias)
+		if err := s.db.SetSetting(dk, alias); err != nil {
+			return fmt.Errorf("set default mailbox: %w", err)
+		}
 	}
 	return nil
 }
@@ -67,13 +72,23 @@ func (s *MailboxService) Remove(userID int, alias string) error {
 		return fmt.Errorf("remove mailbox: %w", err)
 	}
 	dk := fmt.Sprintf("default_mailbox_%d", userID)
-	defAlias, _ := s.db.GetSetting(dk)
+	defAlias, err := s.db.GetSetting(dk)
+	if err != nil {
+		return fmt.Errorf("get default setting: %w", err)
+	}
 	if defAlias == alias {
-		list, _ := s.db.ListMailboxes(userID)
+		list, err := s.db.ListMailboxes(userID)
+		if err != nil {
+			return fmt.Errorf("list mailboxes for default fallback: %w", err)
+		}
 		if len(list) > 0 {
-			s.db.SetSetting(dk, list[0].Alias)
+			if err := s.db.SetSetting(dk, list[0].Alias); err != nil {
+				return fmt.Errorf("set default mailbox fallback: %w", err)
+			}
 		} else {
-			s.db.SetSetting(dk, "")
+			if err := s.db.SetSetting(dk, ""); err != nil {
+				return fmt.Errorf("clear default mailbox: %w", err)
+			}
 		}
 	}
 	return nil
@@ -87,7 +102,10 @@ func (s *MailboxService) Switch(userID int, alias string) error {
 }
 
 func (s *MailboxService) Default(userID int) string {
-	v, _ := s.db.GetSetting(fmt.Sprintf("default_mailbox_%d", userID))
+	v, err := s.db.GetSetting(fmt.Sprintf("default_mailbox_%d", userID))
+	if err != nil {
+		return ""
+	}
 	return v
 }
 
