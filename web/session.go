@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"sync"
 	"time"
 )
 
 type sessionStore struct {
+	mu     sync.Mutex
 	tokens map[string]time.Time
 }
 
@@ -24,7 +26,9 @@ const sessionTTL = 12 * time.Hour
 
 func setSession(w http.ResponseWriter) string {
 	sid := newSession()
+	sessions.mu.Lock()
 	sessions.tokens[sid] = time.Now().Add(sessionTTL)
+	sessions.mu.Unlock()
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
 		Value:    sid,
@@ -41,6 +45,8 @@ func checkSession(r *http.Request) bool {
 	if err != nil {
 		return false
 	}
+	sessions.mu.Lock()
+	defer sessions.mu.Unlock()
 	exp, ok := sessions.tokens[c.Value]
 	if !ok || time.Now().After(exp) {
 		delete(sessions.tokens, c.Value)
