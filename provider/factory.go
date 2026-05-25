@@ -87,3 +87,12 @@ func GetProviderFormInfo(providerType string) *ProviderFormInfo {
 		Fields: copyFields(info.Fields),
 	}
 }
+
+func RegisteredProviders() []string {
+	names := make([]string, 0, len(providerRegistry))
+	for name := range providerRegistry {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}

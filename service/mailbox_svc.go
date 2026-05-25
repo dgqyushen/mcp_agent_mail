@@ -37,7 +37,11 @@ func (s *MailboxService) Update(userID int, alias, name, providerType, baseURL, 
 
 func (s *MailboxService) Add(userID int, alias, name, providerType, baseURL, authData string) error {
 	if providerType == "" {
-		providerType = "cloudflare"
+		registered := provider.RegisteredProviders()
+		if len(registered) == 0 {
+			return fmt.Errorf("no registered providers")
+		}
+		providerType = registered[0]
 	}
 	rec := model.MailboxRecord{
 		UserID:       userID,

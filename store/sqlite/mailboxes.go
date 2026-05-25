@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"agent-mail/model"
+	"agent-mail/provider"
 )
 
 func (db *DB) InsertMailbox(m model.MailboxRecord) error {
@@ -38,7 +39,10 @@ func (db *DB) GetMailbox(userID int, alias string) (*model.MailboxRecord, error)
 		return nil, err
 	}
 	if m.ProviderType == "" {
-		m.ProviderType = "cloudflare"
+		registered := provider.RegisteredProviders()
+		if len(registered) > 0 {
+			m.ProviderType = registered[0]
+		}
 	}
 	return &m, nil
 }
@@ -53,13 +57,19 @@ func (db *DB) ListMailboxes(userID int) ([]model.MailboxRecord, error) {
 	}
 	defer rows.Close()
 	var list []model.MailboxRecord
+	var registered []string
 	for rows.Next() {
 		var m model.MailboxRecord
 		if err := rows.Scan(&m.UserID, &m.Alias, &m.Name, &m.ProviderType, &m.BaseURL, &m.AuthData); err != nil {
 			return nil, err
 		}
 		if m.ProviderType == "" {
-			m.ProviderType = "cloudflare"
+			if registered == nil {
+				registered = provider.RegisteredProviders()
+			}
+			if len(registered) > 0 {
+				m.ProviderType = registered[0]
+			}
 		}
 		list = append(list, m)
 	}
