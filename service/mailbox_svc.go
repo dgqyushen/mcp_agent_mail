@@ -21,6 +21,9 @@ func NewMailboxService(db *sqlite.DB, factory provider.ProviderFactory) *Mailbox
 }
 
 func (s *MailboxService) Update(userID int, alias, name, providerType, baseURL, authData string) error {
+	if !provider.IsRegistered(providerType) {
+		return fmt.Errorf("unsupported provider type: %q", providerType)
+	}
 	rec := model.MailboxRecord{
 		UserID:       userID,
 		Alias:        alias,
@@ -42,6 +45,9 @@ func (s *MailboxService) Add(userID int, alias, name, providerType, baseURL, aut
 			return fmt.Errorf("no registered providers")
 		}
 		providerType = registered[0]
+	}
+	if !provider.IsRegistered(providerType) {
+		return fmt.Errorf("unsupported provider type: %q", providerType)
 	}
 	rec := model.MailboxRecord{
 		UserID:       userID,

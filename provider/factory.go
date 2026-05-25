@@ -88,6 +88,11 @@ func GetProviderFormInfo(providerType string) *ProviderFormInfo {
 	}
 }
 
+func IsRegistered(name string) bool {
+	_, ok := providerRegistry[name]
+	return ok
+}
+
 func RegisteredProviders() []string {
 	names := make([]string, 0, len(providerRegistry))
 	for name := range providerRegistry {
