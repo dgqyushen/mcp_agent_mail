@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/smtp"
 	"strconv"
-	"strings"
 	"time"
 
 	"agent-mail/model"
@@ -35,7 +34,7 @@ func (s *GmailSender) SendMail(body *model.SendMailBody) error {
 		s.fromEmail = profile.EmailAddress
 	}
 
-	msg := buildMessage(body.FromName, s.fromEmail, body.ToMail, body.ToName, body.Subject, body.Content, body.IsHTML)
+	msg := provider.BuildSMTPMessage(body.FromName, s.fromEmail, body.ToMail, body.ToName, body.Subject, body.Content, body.IsHTML)
 	return s.sendWithXOAUTH2(body.ToMail, msg)
 }
 
@@ -192,22 +191,6 @@ func (a *xoauth2Auth) Next(fromServer []byte, more bool) ([]byte, error) {
 		return nil, fmt.Errorf("unexpected XOAUTH2 challenge")
 	}
 	return nil, nil
-}
-
-func buildMessage(fromName, fromEmail, toMail, toName, subject, content string, isHTML bool) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("From: %s <%s>\r\n", fromName, fromEmail))
-	b.WriteString(fmt.Sprintf("To: %s <%s>\r\n", toName, toMail))
-	b.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
-	b.WriteString("MIME-Version: 1.0\r\n")
-	if isHTML {
-		b.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
-	} else {
-		b.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
-	}
-	b.WriteString("\r\n")
-	b.WriteString(content)
-	return b.String()
 }
 
 func messageToSendboxItem(msg *gmail.Message) *model.SendboxItem {

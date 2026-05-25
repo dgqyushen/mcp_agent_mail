@@ -3,6 +3,8 @@ package qqmail
 import (
 	"strings"
 	"testing"
+
+	"agent-mail/provider"
 )
 
 func TestQQmailSender_Validate_NoAuth(t *testing.T) {
@@ -54,7 +56,7 @@ func TestQQmailSender_Validate_WithAuth(t *testing.T) {
 }
 
 func TestBuildSMTPMessage(t *testing.T) {
-	msg := buildSMTPMessage("Alice", "alice@qq.com", "bob@example.com", "Bob", "Hello", "Test body", false)
+	msg := provider.BuildSMTPMessage("Alice", "alice@qq.com", "bob@example.com", "Bob", "Hello", "Test body", false)
 	if !strings.Contains(msg, "From: Alice <alice@qq.com>") {
 		t.Fatal("missing From header")
 	}
@@ -73,7 +75,7 @@ func TestBuildSMTPMessage(t *testing.T) {
 }
 
 func TestBuildSMTPMessage_HTML(t *testing.T) {
-	msg := buildSMTPMessage("Alice", "alice@qq.com", "bob@example.com", "Bob", "Hello", "<h1>Hi</h1>", true)
+	msg := provider.BuildSMTPMessage("Alice", "alice@qq.com", "bob@example.com", "Bob", "Hello", "<h1>Hi</h1>", true)
 	if !strings.Contains(msg, "text/html") {
 		t.Fatal("expected text/html Content-Type")
 	}

@@ -22,7 +22,7 @@ func (s *QQmailSender) Validate() error {
 }
 
 func (s *QQmailSender) SendMail(body *model.SendMailBody) error {
-	msg := buildSMTPMessage(body.FromName, s.auth.Username, body.ToMail, body.ToName, body.Subject, body.Content, body.IsHTML)
+	msg := provider.BuildSMTPMessage(body.FromName, s.auth.Username, body.ToMail, body.ToName, body.Subject, body.Content, body.IsHTML)
 	return s.sendWithLOGIN(body.ToMail, msg)
 }
 
@@ -98,18 +98,4 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 	}
 }
 
-func buildSMTPMessage(fromName, fromEmail, toMail, toName, subject, content string, isHTML bool) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("From: %s <%s>\r\n", fromName, fromEmail))
-	b.WriteString(fmt.Sprintf("To: %s <%s>\r\n", toName, toMail))
-	b.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
-	b.WriteString("MIME-Version: 1.0\r\n")
-	if isHTML {
-		b.WriteString("Content-Type: text/html; charset=\"UTF-8\"\r\n")
-	} else {
-		b.WriteString("Content-Type: text/plain; charset=\"UTF-8\"\r\n")
-	}
-	b.WriteString("\r\n")
-	b.WriteString(content)
-	return b.String()
-}
+

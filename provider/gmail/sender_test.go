@@ -3,6 +3,8 @@ package gmail
 import (
 	"strings"
 	"testing"
+
+	"agent-mail/provider"
 )
 
 func TestGmailSender_Validate_NoAuth(t *testing.T) {
@@ -22,7 +24,7 @@ func TestGmailSender_CheckSendBalance(t *testing.T) {
 }
 
 func TestBuildMessage(t *testing.T) {
-	msg := buildMessage("Alice", "alice@gmail.com", "bob@example.com", "Bob", "Hello", "Test body", false)
+	msg := provider.BuildSMTPMessage("Alice", "alice@gmail.com", "bob@example.com", "Bob", "Hello", "Test body", false)
 	parts := []string{
 		"From: Alice <alice@gmail.com>",
 		"To: Bob <bob@example.com>",
@@ -38,14 +40,14 @@ func TestBuildMessage(t *testing.T) {
 }
 
 func TestBuildMessageHTML(t *testing.T) {
-	msg := buildMessage("", "", "", "", "", "<p>Hello</p>", true)
+	msg := provider.BuildSMTPMessage("", "", "", "", "", "<p>Hello</p>", true)
 	if !strings.Contains(msg, "Content-Type: text/html") {
 		t.Fatal("expected HTML Content-Type")
 	}
 }
 
 func TestBuildMessageHasCRLF(t *testing.T) {
-	msg := buildMessage("A", "a@b.com", "c@d.com", "C", "S", "body", false)
+	msg := provider.BuildSMTPMessage("A", "a@b.com", "c@d.com", "C", "S", "body", false)
 	if !strings.Contains(msg, "\r\n") {
 		t.Fatal("expected CRLF line endings")
 	}
