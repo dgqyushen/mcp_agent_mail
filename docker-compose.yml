@@ -1,9 +1,14 @@
 services:
   agent-mail:
-    image: dgqyushen/agent-mail:latest
-    command: ["--addr", ":8080", "--db-path", "/data/agent-mail.db"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["--addr", ":8080"]
     environment:
       - HOME=/root
+      - ADMIN_PASSWORD=admin123
+      - AUTH_HEADER=X-Agent-Mail-Token
+      - AUTH_TOKEN=test-token-e2e-2026
     ports:
       - "8080:8080"
     volumes:

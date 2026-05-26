@@ -1,0 +1,18 @@
+services:
+  agent-mail:
+    image: dgqyushen/agent-mail:latest
+    command: ["--addr", ":8080"]
+    environment:
+      - HOME=/root
+      - ADMIN_PASSWORD=change-me
+      # Legacy authentication (optional)
+      # - AUTH_HEADER=X-Agent-Mail-Token
+      # - AUTH_TOKEN=your-legacy-token
+    ports:
+      - "8080:8080"
+    volumes:
+      - agent-mail-data:/data
+    restart: unless-stopped
+
+volumes:
+  agent-mail-data:

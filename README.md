@@ -1,149 +1,144 @@
 # agent-mail
 
-MCP (Model Context Protocol) server that wraps [cloudflare_temp_email](https://github.com/dreamhunter2333/cloudflare_temp_email) API for AI agents. Multi-mailbox management, full email CRUD, search, send/reply, and advanced features.
+MCP (Model Context Protocol) server that wraps email APIs for AI agents — Cloudflare Temp Email, Gmail, QQmail. Multi-provider, multi-user, full email CRUD, send/reply, auto-reply, webhooks.
 
 20 MCP tools. Go binary, ~11MB, FROM scratch Docker <20MB.
 
-## Deployment
-
-### VPS Remote (SSE)
+## Quick Start
 
 ```bash
-# 1. Create config on VPS
-mkdir -p ~/.agent-mail
-cat > ~/.agent-mail/config.toml << 'EOF'
-default_mailbox = "work"
-
-[mailboxes.work]
-name = "工作邮箱"
-base_url = "https://mail.your-domain.com"
-jwt = "your-address-jwt-here"
-EOF
-
-# 2. Clone and build
-git clone <repo-url> agent-mail && cd agent-mail
+# Build
 CGO_ENABLED=0 go build -o agent-mail .
 
-# 3. Run on VPS (SSE on :9090)
-./agent-mail --transport sse --addr :9090
+# Run (auto-creates SQLite DB at ~/.agent-mail/data.db)
+./agent-mail
 
-# Or with Docker
-docker compose up -d
+# With custom port and db path
+./agent-mail --addr :9090 --db-path /data/agent-mail.db
 ```
 
-### Local (stdio)
+### Docker
 
 ```bash
-./agent-mail                          # default: --transport stdio
-./agent-mail --config /path/to/config.toml
+docker compose up -d
+# Or manually:
+docker run -d --name agent-mail -p 8080:8080 -v agent-mail-data:/data dgqyushen/agent-mail:latest
 ```
 
-## Transport Modes
+## Transport
 
-| Flag | Mode | Use Case |
-|------|------|----------|
-| `--transport stdio` | stdio (default) | Local agent on same machine |
-| `--transport sse` | SSE over HTTP | Remote VPS, agent connects via URL |
-| `--transport streamable-http` | Streamable HTTP | Remote VPS, alternative protocol |
+Streamable HTTP transport only. MCP endpoint at `/mcp`.
 
-Use `--addr` to set listen address (default `:8080`).
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `:8080` | Listen address |
+| `--db-path` | `~/.agent-mail/data.db` | SQLite database path |
+| `--env-file` | — | Path to `.env` file |
+| `--auth-header` | `$AUTH_HEADER` | Legacy auth header name |
+| `--auth-token` | `$AUTH_TOKEN` | Legacy auth token value |
 
-## Configuration
+## Authentication
 
-`~/.agent-mail/config.toml`:
+MCP requests require `X-Agent-Mail-Token` header. Two modes:
 
-```toml
-default_mailbox = "work"
+### Multi-user mode (recommended)
 
-[mailboxes.work]
-name = "工作邮箱"
-base_url = "https://mail.your-domain.com"
-jwt = "eyJhbGciOiJIUzI1NiIs..."
+1. Start the server, visit `http://your-server:8080/admin/login`
+2. Log in with admin password (auto-generated on first run if `ADMIN_PASSWORD` env not set, check stderr logs)
+3. Create users with unique tokens at `/admin/users`
+4. Use the token in MCP client config
 
-[mailboxes.personal]
-name = "个人邮箱"
-base_url = "https://mail.your-domain.com"
-jwt = "eyJhbGciOiJIUzI1NiIs..."
-site_password = "site-password-if-enabled"
+### Legacy single-user mode
+
+Set env vars `AUTH_HEADER` and `AUTH_TOKEN`, or use CLI flags:
+
+```bash
+./agent-mail --auth-header X-Custom-Auth --auth-token my-secret
+
+# Clients send: X-Custom-Auth: my-secret
 ```
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `default_mailbox` | no | Alias of the default mailbox |
-| `name` | yes | Human-readable display name |
-| `base_url` | yes | API base URL of cloudflare_temp_email instance |
-| `jwt` | yes | Address JWT credential (web UI → your address → credential) |
-| `site_password` | no | Site-wide password if `x-custom-auth` is enabled |
 
 ## Agent Integration
 
-### Local (stdio)
+### VPS (Streamable HTTP)
+
+Put agent-mail behind nginx/Caddy with HTTPS, then:
 
 ```json
 {
   "mcpServers": {
     "agent-mail": {
-      "command": "/path/to/agent-mail"
+      "url": "https://your-domain.com/mcp",
+      "headers": {
+        "X-Agent-Mail-Token": "your-user-token"
+      }
     }
   }
 }
 ```
 
-### Remote (SSE on VPS)
-
-```json
-{
-  "mcpServers": {
-    "agent-mail": {
-      "url": "http://your-vps-ip:8080/sse"
-    }
-  }
-}
-```
-
-### Docker (local)
+### Docker
 
 ```json
 {
   "mcpServers": {
     "agent-mail": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "-e", "HOME=/root", "-v", "~/.agent-mail:/root/.agent-mail:ro", "dgqyushen/agent-mail"]
+      "args": ["run", "-i", "--rm", "--network", "host", "dgqyushen/agent-mail"]
     }
   }
 }
 ```
 
-## Security Notes
+## Adding Mailboxes
 
-- **VPS**: Put agent-mail behind nginx/Caddy with HTTPS + basic auth, then use `https://vps.example.com/sse` as the agent URL
-- **JWT**: Never commit `config.toml`. The file is auto-created with mode `0600`, directory `0700`
-- No auth built into the SSE endpoint — agents trust the network layer
+Via web UI at `/user/login` — log in with your user token, then manage mailboxes.
+
+Or programmatically via MCP tools: `add_mailbox`, `list_mailboxes`, `switch_mailbox`.
+
+### Provider-specific auth_data
+
+| Provider | `provider_type` | `auth_data` (JSON) |
+|----------|----------------|-------------------|
+| Cloudflare Temp Email | `cloudflare` | `{"jwt":"...","site_password":""}` |
+| Gmail | `gmail` | `{"client_id":"...","client_secret":"...","refresh_token":"..."}` |
+| QQmail | `qqmail` | `{"username":"...","password":"...","server":"imap.qq.com"}` |
+
+## Web UI
+
+| Path | Purpose |
+|------|---------|
+| `/` | Redirects to `/user/login` |
+| `/admin/login` | Admin login |
+| `/admin/users` | User management |
+| `/user/login` | User self-service login |
+| `/user/mailboxes` | Mailbox management |
+| `/health` | Health check |
 
 ## MCP Tools (20)
 
 ### Mailbox
 | Tool | Description |
 |------|-------------|
-| `list_mailboxes` | List all mailboxes with JWT validity |
+| `list_mailboxes` | List all mailboxes with validation status |
 | `add_mailbox` | Add a mailbox credential |
 | `remove_mailbox` | Remove a mailbox |
-| `switch_mailbox` | Set default active mailbox |
-| `validate_mailbox` | Check JWT validity |
+| `switch_mailbox` | Switch active (default) mailbox |
+| `validate_mailbox` | Validate mailbox accessibility |
 
 ### Read
 | Tool | Description |
 |------|-------------|
 | `list_emails` | List received emails (paginated) |
 | `get_email` | Get single email with full parsed content |
+| `search_emails` | Search by sender/subject |
 | `delete_email` | Delete a single email |
 | `clear_inbox` | Delete all received emails |
-| `search_emails` | Search by sender/subject keyword |
 
 ### Send
 | Tool | Description |
 |------|-------------|
-| `send_email` | Send email from current mailbox |
+| `send_mail` | Send an email |
 | `check_send_balance` | Check remaining send balance |
 | `list_sent` | List sent emails (paginated) |
 | `delete_sent` | Delete a sent email record |
@@ -156,22 +151,18 @@ site_password = "site-password-if-enabled"
 | `set_auto_reply` | Configure auto-reply |
 | `get_webhook` | Get webhook config |
 | `set_webhook` | Configure webhook URL |
-| `list_attachments` | List S3 attachments |
+| `list_attachments` | List all inbox attachments |
 
-## Docker
+## Security Notes
 
-```bash
-docker pull dgqyushen/agent-mail:latest
-docker run -i --rm -e HOME=/root -v ~/.agent-mail:/root/.agent-mail:ro dgqyushen/agent-mail
-```
-
-Image: ~20MB (multi-stage, FROM scratch)
+- Put agent-mail behind nginx/Caddy with HTTPS on VPS
+- Use multi-user tokens, rotate via admin UI
+- Admin password is auto-generated; set `ADMIN_PASSWORD` env for persistence
+- SQLite DB stored at `~/.agent-mail/data.db` with restricted permissions
 
 ## Build
 
 ```bash
 go build -o agent-mail .
-go test ./...        # 9 tests
+go test ./...
 ```
-
-Image: ~20MB (multi-stage, FROM scratch)

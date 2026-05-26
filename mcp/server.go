@@ -51,7 +51,14 @@ func (s *Server) Start() error {
 	streamableServer := goserver.NewStreamableHTTPServer(mcpSrv)
 
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", AuthMiddleware(streamableServer, s.userSvc))
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/user/login", http.StatusSeeOther)
+	})
+	mux.Handle("/mcp", OriginCheckMiddleware(AuthMiddleware(streamableServer, s.userSvc)))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
